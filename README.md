@@ -2,7 +2,10 @@
 
 
 
-# Autores
+# Code Convention
+All variables, methods and filenames will be written in camelCase.
+
+# Authors
 - Ignacio Matías Vidaurreta
 - Clara Guzzetti
 - José Martín Torreguitar
