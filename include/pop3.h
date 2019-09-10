@@ -1,7 +1,10 @@
 #ifndef POP3__H
 #define POP3__H
 
+    static int cleanUp(int fd, int originFd, int failed);
     int servePOP3ConcurrentBlocking(const int server);
+    static void* handleConnectionPthread(void* args);
+    
 
     /*
     * If the selected METHOD is X'FF', none of the methods listed by the
