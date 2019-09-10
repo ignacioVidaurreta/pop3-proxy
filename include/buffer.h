@@ -100,7 +100,7 @@ struct buffer {
  * inicializa el buffer sin utilizar el heap
  */
 void
-buffer_init(buffer *b, const size_t n, uint8_t *data);
+bufferInit(buffer *b, const size_t n, uint8_t *data);
 
 /**
  * Retorna un puntero donde se pueden escribir hasta `*nbytes`.
@@ -111,8 +111,8 @@ buffer_write_ptr(buffer *b, size_t *nbyte);
 void
 buffer_write_adv(buffer *b, const ssize_t bytes);
 
-uint8_t *
-buffer_read_ptr(buffer *b, size_t *nbyte);
+extern uint8_t *
+bufferReadPointer(buffer *b, size_t *nbyte);
 void
 buffer_read_adv(buffer *b, const ssize_t bytes);
 
@@ -140,7 +140,7 @@ buffer_reset(buffer *b);
 
 /** retorna true si hay bytes para leer del buffer */
 bool
-buffer_can_read(buffer *b);
+bufferCanRead(buffer *b);
 
 /** retorna true si se pueden escribir bytes en el buffer */
 bool

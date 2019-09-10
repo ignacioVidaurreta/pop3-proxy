@@ -8,6 +8,22 @@
 
 #include "include/buffer.h"
 
+void
+buffer_compact(buffer *b) {
+    if(b->data == b->read) {
+        // nada por hacer
+    } else if(b->read == b->write) {
+        b->read  = b->data;
+        b->write = b->data;
+    } else {
+        const size_t n = b->write - b->read;
+        memmove(b->data, b->read, n);
+        b->read  = b->data;
+        b->write = b->data + n;
+    }
+}
+   
+
 void bufferReset(buffer *b){
     b->read  = b->data;
     b->write = b->data;
@@ -39,3 +55,25 @@ uint8_t* bufferReadPointer(buffer *b, size_t *nbytes){
     return b->read;
 
 }
+
+inline void
+buffer_write_adv(buffer *b, const ssize_t bytes) {
+    if(bytes > -1) {
+        b->write += (size_t) bytes;
+        assert(b->write <= b->limit);
+    }
+}
+
+inline void
+buffer_read_adv(buffer *b, const ssize_t bytes) {
+    if(bytes > -1) {
+        b->read += (size_t) bytes;
+        assert(b->read <= b->write);
+
+        if(b->read == b->write) {
+            // compactacion poco costosa
+            buffer_compact(b);
+        }
+    }
+}
+

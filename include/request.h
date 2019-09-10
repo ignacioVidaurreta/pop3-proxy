@@ -141,8 +141,7 @@ request_consume(buffer *b, struct request_parser *p, bool *errored);
  *
  * En caso de haber terminado permite tambien saber si se debe a un error
  */
-bool 
-request_is_done(const enum request_state st, bool *errored);
+bool request_is_done(const enum request_state st, bool *errored);
 
 void
 request_close(struct request_parser *p);
@@ -159,14 +158,13 @@ request_marshall(buffer *b,
 
 
 /** convierte a errno en socks_response_status */
-enum socks_response_status
-errno_to_socks(int e);
+enum socksResponseStatus errno_to_socks(int e);
 
 #include <netdb.h>
 #include <arpa/inet.h>
 
 /** se encarga de la resolcuión de un request */
-enum socks_response_status
+enum socksResponseStatus
 cmd_resolve(struct request* request,  struct sockaddr **originaddr,
             socklen_t *originlen, int *domain);
 

@@ -6,7 +6,8 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
-#include "netutils.h"
+#include "include/netutils.h"
+#include "include/buffer.h"
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 
@@ -54,15 +55,14 @@ sockaddr_to_human(char *buff, const size_t buffsize,
     return buff;
 }
 
-int
-sock_blocking_write(const int fd, buffer *b) {
-        int  ret = 0;
+int sockBlockingWrite(const int fd, buffer *b) {
+    int  ret = 0;
     ssize_t  nwritten;
-	 size_t  n;
+	size_t  n;
 	uint8_t *ptr;
 
     do {
-        ptr = buffer_read_ptr(b, &n);
+        ptr = bufferReadPointer(b, &n);
         nwritten = send(fd, ptr, n, MSG_NOSIGNAL);
         if (nwritten > 0) {
             buffer_read_adv(b, nwritten);
@@ -70,13 +70,12 @@ sock_blocking_write(const int fd, buffer *b) {
             ret = errno;
             break;
         }
-    } while (buffer_can_read(b));
+    } while (bufferCanRead(b));
 
     return ret;
 }
 
-int
-sock_blocking_copy(const int source, const int dest) {
+int sock_blocking_copy(const int source, const int dest) {
     int ret = 0;
     char buf[4096];
     ssize_t nread;
