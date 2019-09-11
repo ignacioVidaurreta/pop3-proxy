@@ -32,10 +32,8 @@ int main(const int argc, const char **argv){
     if (server < 0) return printError("Error: Unable to create socket");
 
     fprintf(stdout, "Listening on TCP port %d\n", port);
-
     // man 7 ip. no importa reportar nada si falla.
     setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
-
     if(bind(server, (struct sockaddr*)&addr, sizeof(addr)) < 0)
         return printError("Error: Unable to bind socket");
 
