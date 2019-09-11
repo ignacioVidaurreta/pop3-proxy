@@ -39,7 +39,7 @@ static void POP3HandleConnection(const int fd, const struct sockaddr* clientAddr
     const int serverFd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
     if(serverFd < 0){
-        fprintf(stderr,"Cannot connect to POP3 server");
+        fprintf(stderr,"Cannot connect to POP3 server\n");
         return;
     }
 
@@ -47,7 +47,6 @@ static void POP3HandleConnection(const int fd, const struct sockaddr* clientAddr
     memset(&serverAddress, 0, sizeof(serverAddress));
     serverAddress.sin_family = AF_INET;
 
-    
     int ret = inet_pton(AF_INET, LOCALHOST, &serverAddress.sin_addr.s_addr);
     if( ret == 0){
         fprintf(stderr, "inet_pton() failed: Invalid network address");
@@ -66,7 +65,7 @@ static void POP3HandleConnection(const int fd, const struct sockaddr* clientAddr
 
     //TODO(TEAM) A partir de acá, ya tenemos la mecánica de conexión (WIJUU FINALLY)
     //Ahora tenemos que ver cómo vamos a hacer para manejar los comandos y todo.
-    fprintf(stdout, "[WIP]");
+    fprintf(stdout, "[WIP]\n");
 }
 
 /**
@@ -98,9 +97,8 @@ int servePOP3ConcurrentBlocking(const int server){
         struct sockaddr_in6 clientAddr;
         socklen_t clientAddrLen = sizeof(clientAddr);
         // Wait for client to connect
-        fprintf(stdout, "Hello World 1\n"); 
+        fprintf(stdout, "Waiting for conneciton on port %d\n", SERVER_LISTEN_PORT);
         const int client = accept(server, (struct sockaddr*)&clientAddr, &clientAddrLen);
-
         if( client < 0){
             perror("Unable to accept incoming socket");
         }else{
