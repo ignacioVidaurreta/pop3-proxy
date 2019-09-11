@@ -14,10 +14,16 @@
 #include <arpa/inet.h>
 
 #include "include/pop3.h"
+#include "include/parser.h"
+#include "include/server.h"
+#include "include/client.h"
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 #define LOCALHOST "127.0.0.1"
 #define SERVER_LISTEN_PORT 110
+
+#define TRUE 1
+#define FALSE 0
 
 int clean_up(int fd, int origin_fd, int failed){
     if(origin_fd != 1){
@@ -35,7 +41,7 @@ int clean_up(int fd, int origin_fd, int failed){
  * @param caddr  información de la conexiónentrante.
  */
 static void POP3_handle_connection(const int fd, const struct sockaddr* clientAddress){
-    
+
     const int server_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
     if(server_fd < 0){
@@ -63,9 +69,28 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
         return;
     }
 
-    //TODO(TEAM) A partir de acá, ya tenemos la mecánica de conexión (WIJUU FINALLY)
-    //Ahora tenemos que ver cómo vamos a hacer para manejar los comandos y todo.
-    fprintf(stdout, "[WIP]\n");
+    int ended = FALSE;
+    char response[100];
+    //Initial connection to server
+    read_from_server(server_fd, response);
+    write_response(fd, response);
+
+    while(!ended){
+        char command[100]; //TODO(Nachito): Change hardcoded size to actual significant value
+        memset(response, 0, 100);
+        memset(command, 0, 100);
+        read_command(fd, command);
+
+        write_to_server(server_fd, command);
+        read_from_server(server_fd, response);
+        write_response(fd, response);
+
+        if(strcmp(command, "QUIT\n") == 0){
+            ended = TRUE;
+        }
+    }
+    //close(fd);
+    //close(server_fd);
 }
 
 /**

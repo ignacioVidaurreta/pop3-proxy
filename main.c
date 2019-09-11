@@ -12,14 +12,16 @@
 
 #include "include/pop3.h"
 
+#define DEFAULT_PORT 1110
+
 int print_error(const char* error_msg){
     perror(error_msg);
     return 0;
 }
 
 
-int main(const int argc, const char **argv){
-    unsigned port = 1100;
+int main(const int argc, char * const* argv){
+    unsigned port = DEFAULT_PORT;
 
     //TODO(Nachito) Change port via command-line
     struct sockaddr_in addr;
