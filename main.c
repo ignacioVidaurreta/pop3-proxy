@@ -40,7 +40,7 @@ int main(const int argc, const char **argv){
     if(listen(server,20) < 0)
         return print_error("Error: Unable to listen");
 
-    return servePOP3ConcurrentBlocking(server);
+    return serve_POP3_concurrent_blocking(server);
     
     
 

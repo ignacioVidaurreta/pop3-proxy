@@ -19,9 +19,9 @@
 #define LOCALHOST "127.0.0.1"
 #define SERVER_LISTEN_PORT 110
 
-int cleanUp(int fd, int originFd, int failed){
-    if(originFd != 1){
-        close(originFd);
+int clean_up(int fd, int origin_fd, int failed){
+    if(origin_fd != 1){
+        close(origin_fd);
     }
     close(fd);
 
@@ -79,7 +79,7 @@ struct connection {
 };
 
 // Rutina de cada worker
-void* handleConnectionPthread(void* args){
+void* handle_connection_pthread(void* args){
     const struct connection *c = args;
 
     // Desatachear para liberar los recursos una vez que termine el proceso
@@ -92,29 +92,29 @@ void* handleConnectionPthread(void* args){
     return 0;
 }
 
-int servePOP3ConcurrentBlocking(const int server){
+int serve_POP3_concurrent_blocking(const int server){
     while(1){
-        struct sockaddr_in6 clientAddr;
-        socklen_t clientAddrLen = sizeof(clientAddr);
+        struct sockaddr_in6 client_address;
+        socklen_t client_address_len = sizeof(client_address);
         // Wait for client to connect
         fprintf(stdout, "Waiting for conneciton on port %d\n", SERVER_LISTEN_PORT);
-        const int client = accept(server, (struct sockaddr*)&clientAddr, &clientAddrLen);
+        const int client = accept(server, (struct sockaddr*)&client_address, &client_address_len);
         if( client < 0){
             perror("Unable to accept incoming socket");
         }else{
             struct connection* c = malloc(sizeof(struct connection));
             if (c == NULL){
                 // lo trabajamos iterativamente
-                POP3_handle_connection(client, (struct sockaddr*)&clientAddr);
+                POP3_handle_connection(client, (struct sockaddr*)&client_address);
             }else{
                 pthread_t tid;
                 c -> fd      = client;
-                c -> addrlen = clientAddrLen;
-                memcpy(&(c->addr), &clientAddr, clientAddrLen);
-                if (pthread_create(&tid, 0, handleConnectionPthread, c)) {
+                c -> addrlen = client_address_len;
+                memcpy(&(c->addr), &client_address, client_address_len);
+                if (pthread_create(&tid, 0, handle_connection_pthread, c)) {
                     free(c);
                     //lo trabajamos iterativamente
-                    POP3_handle_connection(client, (struct sockaddr*)&clientAddr);
+                    POP3_handle_connection(client, (struct sockaddr*)&client_address);
                 }
             }
         }

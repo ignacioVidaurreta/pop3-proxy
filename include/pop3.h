@@ -1,8 +1,8 @@
 #ifndef POP3__H
 #define POP3__H
 
-    int cleanUp(int fd, int originFd, int failed);
-    int servePOP3ConcurrentBlocking(const int server);
-    void* handleConnectionPthread(void* args);
+    int clean_up(int fd, int originFd, int failed);
+    int serve_POP3_concurrent_blocking(const int server);
+    void* handle_connection_pthread(void* args);
 
 #endif
