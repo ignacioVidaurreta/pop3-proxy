@@ -34,20 +34,20 @@ int cleanUp(int fd, int originFd, int failed){
  * @param fd     descriptor de la conexión entrante.
  * @param caddr  información de la conexiónentrante.
  */
-static void POP3HandleConnection(const int fd, const struct sockaddr* clientAddress){
+static void POP3_handle_connection(const int fd, const struct sockaddr* clientAddress){
     
-    const int serverFd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    const int server_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
-    if(serverFd < 0){
+    if(server_fd < 0){
         fprintf(stderr,"Cannot connect to POP3 server\n");
         return;
     }
 
-    struct sockaddr_in serverAddress;
-    memset(&serverAddress, 0, sizeof(serverAddress));
-    serverAddress.sin_family = AF_INET;
+    struct sockaddr_in server_address;
+    memset(&server_address, 0, sizeof(server_address));
+    server_address.sin_family = AF_INET;
 
-    int ret = inet_pton(AF_INET, LOCALHOST, &serverAddress.sin_addr.s_addr);
+    int ret = inet_pton(AF_INET, LOCALHOST, &server_address.sin_addr.s_addr);
     if( ret == 0){
         fprintf(stderr, "inet_pton() failed: Invalid network address");
         return;
@@ -55,10 +55,10 @@ static void POP3HandleConnection(const int fd, const struct sockaddr* clientAddr
         fprintf(stderr,"inet_pton() failed: Invalid address family");
         return;
     }
-    serverAddress.sin_port = htons((in_port_t) SERVER_LISTEN_PORT);
+    server_address.sin_port = htons((in_port_t) SERVER_LISTEN_PORT);
 
     //Connect to POP3 server
-    if(connect(serverFd, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0){
+    if(connect(server_fd, (struct sockaddr*)&server_address, sizeof(server_address)) < 0){
         fprintf(stderr,"Connection to POP3 Server failed");
         return;
     }
@@ -86,7 +86,7 @@ void* handleConnectionPthread(void* args){
     // Esto significa que no puede ser joineado con otros threads.
     pthread_detach(pthread_self());
 
-    POP3HandleConnection(c-> fd, (struct sockaddr*) &c->addr);
+    POP3_handle_connection(c-> fd, (struct sockaddr*) &c->addr);
     free(args);
 
     return 0;
@@ -105,7 +105,7 @@ int servePOP3ConcurrentBlocking(const int server){
             struct connection* c = malloc(sizeof(struct connection));
             if (c == NULL){
                 // lo trabajamos iterativamente
-                POP3HandleConnection(client, (struct sockaddr*)&clientAddr);
+                POP3_handle_connection(client, (struct sockaddr*)&clientAddr);
             }else{
                 pthread_t tid;
                 c -> fd      = client;
@@ -114,7 +114,7 @@ int servePOP3ConcurrentBlocking(const int server){
                 if (pthread_create(&tid, 0, handleConnectionPthread, c)) {
                     free(c);
                     //lo trabajamos iterativamente
-                    POP3HandleConnection(client, (struct sockaddr*)&clientAddr);
+                    POP3_handle_connection(client, (struct sockaddr*)&clientAddr);
                 }
             }
         }
