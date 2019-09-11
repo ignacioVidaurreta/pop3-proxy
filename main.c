@@ -12,8 +12,8 @@
 
 #include "include/pop3.h"
 
-int printError(const char* errorMsg){
-    perror(errorMsg);
+int print_error(const char* error_msg){
+    perror(error_msg);
     return 0;
 }
 
@@ -29,18 +29,18 @@ int main(const int argc, const char **argv){
     addr.sin_port           = htons(port);
 
     const int server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (server < 0) return printError("Error: Unable to create socket");
+    if (server < 0) return print_error("Error: Unable to create socket");
 
     fprintf(stdout, "Listening on TCP port %d\n", port);
     // man 7 ip. no importa reportar nada si falla.
     setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
     if(bind(server, (struct sockaddr*)&addr, sizeof(addr)) < 0)
-        return printError("Error: Unable to bind socket");
+        return print_error("Error: Unable to bind socket");
 
     if(listen(server,20) < 0)
-        return printError("Error: Unable to listen");
+        return print_error("Error: Unable to listen");
 
-    return servePOP3ConcurrentBlocking(server);
+    return serve_POP3_concurrent_blocking(server);
     
     
 
