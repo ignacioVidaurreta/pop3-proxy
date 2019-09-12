@@ -11,8 +11,9 @@
 #include <unistd.h>
 
 #include "include/pop3.h"
+#include "include/config.h"
 
-#define DEFAULT_PORT 1110
+extern struct config* options;
 
 int print_error(const char* error_msg){
     perror(error_msg);
@@ -21,22 +22,18 @@ int print_error(const char* error_msg){
 
 
 int main(const int argc, char * const* argv){
-    unsigned port = DEFAULT_PORT;
+    //Initialize configuration with default values
+    initialize_config();
 
-    //TODO(Nachito) Change port via command-line
-    struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr)); // Fill struct with zeros
-    addr.sin_family         = AF_INET;
-    addr.sin_addr.s_addr    = htonl(INADDR_ANY);
-    addr.sin_port           = htons(port);
-
+    // TODO(Nachito): Change configuration based on CLI parameters
+    
     const int server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (server < 0) return print_error("Error: Unable to create socket");
 
-    fprintf(stdout, "Listening on TCP port %d\n", port);
+    fprintf(stdout, "Listening on TCP port %d\n", options->local_port);
     // man 7 ip. no importa reportar nada si falla.
     setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
-    if(bind(server, (struct sockaddr*)&addr, sizeof(addr)) < 0)
+    if(bind(server, (struct sockaddr*)&options->proxy_address, sizeof(options->proxy_address)) < 0)
         return print_error("Error: Unable to bind socket");
 
     if(listen(server,20) < 0)
