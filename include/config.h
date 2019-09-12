@@ -8,9 +8,9 @@
 */
 struct config {
 
-    int local_port;
-    int origin_port;
-    int management_port;
+    long int local_port;
+    long int origin_port;
+    long int management_port;
 
     // Target file to redirect stderr when executing a filter
     char* error_file;
@@ -36,5 +36,6 @@ struct config {
 extern struct config* options;
 
 void initialize_config();
+void update_config(const int argc, char* const *argv);
 
 #endif /* CONFIG_H */ 

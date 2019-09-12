@@ -24,13 +24,12 @@ int print_error(const char* error_msg){
 int main(const int argc, char * const* argv){
     //Initialize configuration with default values
     initialize_config();
-
-    // TODO(Nachito): Change configuration based on CLI parameters
+    update_config(argc, argv);
     
     const int server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (server < 0) return print_error("Error: Unable to create socket");
 
-    fprintf(stdout, "Listening on TCP port %d\n", options->local_port);
+    fprintf(stdout, "Listening on TCP port %ld\n", options->local_port);
     // man 7 ip. no importa reportar nada si falla.
     setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
     if(bind(server, (struct sockaddr*)&options->proxy_address, sizeof(options->proxy_address)) < 0)

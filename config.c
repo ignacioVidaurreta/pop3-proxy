@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <limits.h>
+#include <errno.h>
+#include <getopt.h>
 
 #include "include/config.h"
 
@@ -32,4 +35,41 @@ void initialize_config(){
         -> cmd
     */
 
+}
+/*
+ *  Gets int value of the string port
+ *  Code taken for Juan F. Codagnones' "SocksV5 Sockets Implementation"
+ */
+int get_port_number(char* port){
+
+    char *end = 0;
+    const long sl = strtol(port, &end, 10);
+    
+    if (end == port|| '\0' != *end
+          || ((LONG_MIN == sl || LONG_MAX == sl) && ERANGE == errno)
+          || sl < 0 || sl > USHRT_MAX) {
+           fprintf(stderr, "port should be an integer: %s\n", port);
+           return -1;
+        }
+    return sl;
+    
+
+}
+
+/**
+ *  Parse command line arguments to update configuration.
+ */
+void update_config(const int argc, char* const *argv){
+    int opt;
+    long port;
+
+    while((opt = getopt(argc, argv, "p:")) != -1){
+        switch(opt){
+            case 'p':
+                port = get_port_number(optarg);
+                if (port == -1 ) exit(1); //TODO(Nachito): Configure chain of returns
+                options->local_port = port;
+                break;
+        }
+    }
 }
