@@ -8,15 +8,16 @@ enum level {INFO, DEBUG, WARNING, ERROR};
 
 struct log_message {
     enum level msg_level;
-    time_t timestamp;
+    char *timestamp;
     char *message;
     int fd;
 };
 
 
-int print_error(char *err_msg);
+char *get_time();
+int print_error(char *err_msg, char *timestamp);
 void write_log(struct log_message* log);
 void log_port(char* msg, in_port_t port);
-void logger(enum level msg_level, char* message);
+void logger(enum level msg_level, char* message, char *timestamp);
 
 #endif /* LOGGER_H */

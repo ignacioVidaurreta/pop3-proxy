@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <netinet/in.h>
+#include <time.h>
 
 #include "include/logger.h"
 
@@ -19,10 +20,20 @@ char *get_level_string(enum level msg_level){
             return NULL;
     }
 }
+/*
+ * Code taken from: https://stackoverflow.com/questions/1442116/how-to-get-the-date-and-time-values-in-a-c-program
+ */
+char *get_time(){
+    time_t t = time(NULL);
+    struct tm tm = *localtime(&t);
+    char *time = malloc(10*sizeof(char));
+    sprintf(time, "%d:%d:%d", tm.tm_hour, tm.tm_min, tm.tm_sec);
+    return time;
+}
 
 
-int print_error(char* error_msg){
-    logger(ERROR, error_msg);
+int print_error(char* error_msg, char *timestamp){
+    logger(ERROR, error_msg, timestamp);
     return 0;
 }
 
@@ -32,19 +43,21 @@ void write_log(struct log_message* log){
         perror("Error writing log");
         return;
     }
-    fprintf(stdout, "%s\t%s\n", level, log->message);
+    fprintf(stdout, "%s %s\t%s\n", level, log->timestamp, log->message);
 }
 
 void log_port(char *msg, in_port_t port_num ){
-    fprintf(stdout, "[ INFO ]\t %s %d\n", msg, port_num);
+    char* current_time = get_time();
+    fprintf(stdout, "[ INFO ] %s\t%s %d\n", current_time, msg, port_num);
 }
 
 /* 
  *  Handles the creation and writing of the log
  */
-void logger(enum level msg_level, char *message){
+void logger(enum level msg_level, char *message, char *timestamp){
     struct log_message* log = malloc(sizeof(*log));
     log->msg_level = msg_level;
-    log->message = message;
+    log->message   = message;
+    log->timestamp = timestamp;
     write_log(log);
 }

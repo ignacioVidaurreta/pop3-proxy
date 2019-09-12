@@ -58,17 +58,17 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
 
     int ret = inet_pton(AF_INET, LOCALHOST, &server_address.sin_addr.s_addr);
     if( ret == 0){
-        print_error("inet_pton() failed: Invalid network address");
+        print_error("inet_pton() failed: Invalid network address", get_time());
         return;
     }else if (ret < 0){
-        print_error("inet_pton() failed: Invalid address family");
+        print_error("inet_pton() failed: Invalid address family", get_time());
         return;
     }
     server_address.sin_port = htons((in_port_t) options->origin_port);
 
     //Connect to POP3 server
     if(connect(server_fd, (struct sockaddr*)&server_address, sizeof(server_address)) < 0){
-        print_error("Connection to POP3 Server failed");
+        print_error("Connection to POP3 Server failed", get_time());
         return;
     }
 
@@ -129,7 +129,7 @@ int serve_POP3_concurrent_blocking(const int server){
 
         const int client = accept(server, (struct sockaddr*)&client_address, &client_address_len);
         if( client < 0){
-            print_error("Unable to accept incoming socket");
+            print_error("Unable to accept incoming socket", get_time());
         }else{
             struct connection* c = malloc(sizeof(struct connection));
             if (c == NULL){
