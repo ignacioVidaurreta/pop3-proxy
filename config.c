@@ -36,6 +36,21 @@ void initialize_config(){
     */
 
 }
+
+void print_usage(char *cmd_name){
+    fprintf(stdout, "Usage: %s -h for help\n", cmd_name);
+    fprintf(stdout, "Usage: %s -v to print version\n", cmd_name);
+    fprintf(stdout, "Usage: %s \t [-e ERROR_FILE]\n", cmd_name);
+    fprintf(stdout, "\t\t [-h ]\n");
+    fprintf(stdout, "\t\t [-l POP3_ADDRESS ]\n");
+    fprintf(stdout, "\t\t [-L MANAGEMENT_ADDRESS ]\n");
+    fprintf(stdout, "\t\t [-m REPLACEMENT_MESSAGE ]\n");
+    fprintf(stdout, "\t\t [-M CENSURED_MEDIA_TYPES ]\n");
+    fprintf(stdout, "\t\t [-o MANAGEMENT_PORT ]\n");
+    fprintf(stdout, "\t\t [-p LOCAL_PORT ]\n");
+    fprintf(stdout, "\t\t [-P ORIGIN_PORT ]\n");
+    fprintf(stdout, "\t\t [-t CMD ] origin_server\n");
+}
 /*
  *  Gets int value of the string port
  *  Code taken for Juan F. Codagnones' "SocksV5 Sockets Implementation"
@@ -55,7 +70,28 @@ int get_port_number(char* port){
     
 
 }
+/*
+ *  Specify the file where stderr will be redirected when executing
+ *  a filter. 
+ *  TODO: Make some validations
+ */
+void change_error_file(char *filename){
+    memset(options->error_file, 0, strlen(options->error_file));
+    strcpy(options->error_file, filename);
+}
 
+/*
+ *  
+ */
+void replace_string(char *previous, char *new){
+    char *tmp = realloc(previous, strlen(new)+1);
+    if( tmp == NULL){
+        fprintf(stdout, "Memory Error: Couldn't reallocate");
+        exit(1);
+    }
+
+    strncpy(previous, new, strlen(new) +1 );
+}
 /**
  *  Parse command line arguments to update configuration.
  */
@@ -63,12 +99,45 @@ void update_config(const int argc, char* const *argv){
     int opt;
     long port;
 
-    while((opt = getopt(argc, argv, "p:")) != -1){
+    while((opt = getopt(argc, argv, "p:P:o:vhe:l:L:m:M:")) != -1){
         switch(opt){
             case 'p':
                 port = get_port_number(optarg);
                 if (port == -1 ) exit(1); //TODO(Nachito): Configure chain of returns
                 options->local_port = port;
+                break;
+            case 'P':
+                port = get_port_number(optarg);
+                if (port == -1 ) exit(1); //TODO(Nachito): Configure chain of returns
+                options->origin_port = port;
+                break;
+            case 'o':
+                port = get_port_number(optarg);
+                if (port == -1 ) exit(1); //TODO(Nachito): Configure chain of returns
+                options->management_port = port;
+                break;
+            case 'e':
+                change_error_file(optarg);
+                break;
+            case 'h':
+                print_usage(argv[0]);
+                exit(0);
+                break;
+            case 'v':
+                fprintf(stdout, "Version: %s\n", options->version);
+                exit(0);
+                break;
+            case 'l':
+                fprintf(stdout, "WIP");
+                break;
+            case 'L':
+                fprintf(stdout, "WIP");
+                break;
+            case 'm':
+                replace_string(options->replacement_message, optarg); //TODO(Nachito): Test this
+                break;
+            case 'M':
+                fprintf(stdout, "WIP");
                 break;
         }
     }
