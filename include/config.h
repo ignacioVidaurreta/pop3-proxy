@@ -33,11 +33,10 @@ struct config {
 
 };
 
-extern struct config* options;
-
 void initialize_config();
 void print_usage(char *cmd_name);
 int get_port_number(char* port);
+void change_port(in_port_t *port, char *port_str);
 void change_error_file(char *filename);
 void replace_string(char *previous, char *new);
 void update_config(const int argc, char* const *argv);

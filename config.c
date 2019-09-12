@@ -70,6 +70,13 @@ int get_port_number(char* port){
     
 
 }
+
+void change_port(in_port_t *port, char *port_str){
+    long port_num = get_port_number(port_str);
+    if (*port == -1 ) exit(1); //TODO(Nachito): Configure chain of returns
+    *port = port_num;
+}
+
 /*
  *  Specify the file where stderr will be redirected when executing
  *  a filter. 
@@ -97,24 +104,18 @@ void replace_string(char *previous, char *new){
  */
 void update_config(const int argc, char* const *argv){
     int opt;
-    long port;
 
     while((opt = getopt(argc, argv, "p:P:o:vhe:l:L:m:M:")) != -1){
         switch(opt){
             case 'p':
-                port = get_port_number(optarg);
-                if (port == -1 ) exit(1); //TODO(Nachito): Configure chain of returns
-                options->local_port = port;
+                change_port(&options->local_port, optarg);
+                options->proxy_address.sin_port = htons(options->local_port);
                 break;
             case 'P':
-                port = get_port_number(optarg);
-                if (port == -1 ) exit(1); //TODO(Nachito): Configure chain of returns
-                options->origin_port = port;
+                change_port(&options->origin_port, optarg);
                 break;
             case 'o':
-                port = get_port_number(optarg);
-                if (port == -1 ) exit(1); //TODO(Nachito): Configure chain of returns
-                options->management_port = port;
+                change_port(&options->management_port, optarg);
                 break;
             case 'e':
                 change_error_file(optarg);
