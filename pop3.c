@@ -18,6 +18,7 @@
 #include "include/server.h"
 #include "include/client.h"
 #include "include/config.h"
+#include "include/logger.h"
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 #define LOCALHOST "127.0.0.1"
@@ -57,17 +58,17 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
 
     int ret = inet_pton(AF_INET, LOCALHOST, &server_address.sin_addr.s_addr);
     if( ret == 0){
-        fprintf(stderr, "inet_pton() failed: Invalid network address");
+        print_error("inet_pton() failed: Invalid network address");
         return;
     }else if (ret < 0){
-        fprintf(stderr,"inet_pton() failed: Invalid address family");
+        print_error("inet_pton() failed: Invalid address family");
         return;
     }
     server_address.sin_port = htons((in_port_t) options->origin_port);
 
     //Connect to POP3 server
     if(connect(server_fd, (struct sockaddr*)&server_address, sizeof(server_address)) < 0){
-        fprintf(stderr,"Connection to POP3 Server failed");
+        print_error("Connection to POP3 Server failed");
         return;
     }
 
@@ -124,10 +125,11 @@ int serve_POP3_concurrent_blocking(const int server){
         struct sockaddr_in6 client_address;
         socklen_t client_address_len = sizeof(client_address);
         // Wait for client to connect
-        fprintf(stdout, "Waiting for conneciton on port %d\n", options->origin_port);
+        log_port("Waiting for conneciton on port", options->origin_port);
+
         const int client = accept(server, (struct sockaddr*)&client_address, &client_address_len);
         if( client < 0){
-            perror("Unable to accept incoming socket");
+            print_error("Unable to accept incoming socket");
         }else{
             struct connection* c = malloc(sizeof(struct connection));
             if (c == NULL){
