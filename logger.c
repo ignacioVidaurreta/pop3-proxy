@@ -27,7 +27,7 @@ char *get_time(){
     time_t t = time(NULL);
     struct tm tm = *localtime(&t);
     char *time = malloc(10*sizeof(char));
-    sprintf(time, "%d:%d:%d", tm.tm_hour, tm.tm_min, tm.tm_sec);
+    sprintf(time, "%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);
     return time;
 }
 
@@ -43,12 +43,12 @@ void write_log(struct log_message* log){
         perror("Error writing log");
         return;
     }
-    fprintf(stdout, "%s %s\t%s\n", level, log->timestamp, log->message);
+    fprintf(stdout, "[%s] %s\t%s\n", log->timestamp,level, log->message);
 }
 
 void log_port(char *msg, in_port_t port_num ){
     char* current_time = get_time();
-    fprintf(stdout, "[ INFO ] %s\t%s %d\n", current_time, msg, port_num);
+    fprintf(stdout, "[%s][ INFO ]\t%s %d\n", current_time, msg, port_num);
 }
 
 /* 
