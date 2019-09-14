@@ -100,7 +100,6 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
                 read_command(fd, buffer); 
                 parse_command(buffer);
                 write_to_server(server_fd, buffer);
-
                 break;
             default: 
                 print_error("Perror lel equis deeeee", get_time());

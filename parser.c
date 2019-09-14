@@ -26,6 +26,7 @@ void read_multiline_command(char buffer[]){
     int ended = FALSE;
 
     if(buffer[0] == '-'){
+        state->state = REQUEST;
         return; //Do not parse, it's actually single line
     }
 
@@ -75,7 +76,7 @@ void parse_response(char* buffer) {
 
 }
 void parse_command(char* buffer) {
-      char cmd[8], extra[64];
+    char cmd[8], extra[64];
     sscanf(buffer,"%s %s", cmd, extra);
 
     if ( strcasecmp(cmd, "RETR") == 0 || strcasecmp(cmd, "LIST") == 0 || strcasecmp(cmd, "CAPA") == 0 || strcasecmp(cmd, "UIDL") == 0 || strcasecmp(cmd, "TOP") == 0) {
