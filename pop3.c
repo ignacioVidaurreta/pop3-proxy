@@ -93,12 +93,12 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
             case RESPONSE: 
                 memset(buffer,0,BUFFER_MAX_SIZE);
                 read_from_server(server_fd, buffer);
-                parse_response(buffer); //TODO: create function. In charge of defining next state
+                parse_response(buffer);
                 write_response(fd, buffer);//TODO: Change fd 3 client_fd
                 break;
             case REQUEST:
                 read_command(fd, buffer); 
-                parse_command(buffer);//TODO: create function. Must include a way to leave the fucking place (ended variable). In charge of defining next state
+                parse_command(buffer);
                 write_to_server(server_fd, buffer);
 
                 break;
