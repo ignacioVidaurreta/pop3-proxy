@@ -64,6 +64,11 @@ void read_multiline_command(char buffer[]){
 }
 
 void parse_response(char* buffer) {
+    if(state->is_single_line){
+        state->state = REQUEST;
+    }else{
+        read_multiline_command(buffer);
+    }
 
 }
 void parse_command(char* buffer) {
