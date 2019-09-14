@@ -4,6 +4,10 @@
 #include <sys/socket.h>
 
 #include "include/server.h"
+#include "include/pop3.h"
+
+extern struct state_manager* state;
+
 
 /*
  * Read output from server
@@ -21,4 +25,6 @@ void write_to_server(int server_fd, char *cmd){
     if(send(server_fd, cmd, strlen(cmd), 0)<0){
         perror("Error sending data to server\n");
     }
+    state->state = RESPONSE;
+
 }
