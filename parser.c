@@ -15,7 +15,7 @@ extern struct state_manager *state;
  */
 void read_command(int fd, char *command){
     memset(command, 0, strlen(command));
-    if((n = recv(fd, command, 100, 0)) < 0){
+    if((recv(fd, command, 100, 0)) < 0){
         perror("Error reading comand from filedescriptor\n");
         exit(1);
     }
