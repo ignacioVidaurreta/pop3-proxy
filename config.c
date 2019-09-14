@@ -70,16 +70,6 @@ int get_port_number(char* port){
     
 
 }
-/*
- *  Port assignment should depend wheter we are using IPv4 or IPv6
- */
-void assign_port(struct sockaddr_in6 *address){
-    if( ((struct sockaddr*)address)->sa_family == AF_INET){
-        ((struct sockaddr_in*)address)->sin_port = htons(options->local_port);
-    }else if(((struct sockaddr*)address)->sa_family == AF_INET6){
-        address->sin6_port = htons(options->local_port);
-    }
-}
 
 void change_port(in_port_t *port, char *port_str){
     long port_num = get_port_number(port_str);
@@ -119,6 +109,7 @@ void update_config(const int argc, char* const *argv){
         switch(opt){
             case 'p':
                 change_port(&options->local_port, optarg);
+                options->proxy_address.sin_port = htons(options->local_port);
                 break;
             case 'P':
                 change_port(&options->origin_port, optarg);
@@ -151,7 +142,4 @@ void update_config(const int argc, char* const *argv){
                 break;
         }
     }
-
-    assign_port((struct sockaddr_in*)&options->proxy_address);
-    //assign_port((struct sockaddr*)&options->managment_address);
 }
