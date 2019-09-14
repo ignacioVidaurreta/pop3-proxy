@@ -14,7 +14,7 @@ debug:
 
 clean:
 	@echo "Cleaning up ..."
-	rm -f run run_debug a.out
+	rm -f run run_debug tests/a.out
 	@echo "Done!"
 
 test: all
