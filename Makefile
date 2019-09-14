@@ -17,11 +17,15 @@ clean:
 	rm -f run run_debug a.out
 	@echo "Done!"
 
-test:
+test: all
 	@echo "Running tests!"
-	@$(CC) $(CFLAGS) $(FILES) -o run
 	gcc tests/AllTests.c tests/CuTest.c tests/config_tests.c
 	@./a.out
 	@echo "Done!"
 
+run: all
+	@./run
+
+gdb: debug
+	gdb run_debug
 
