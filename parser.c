@@ -23,9 +23,6 @@ void read_command(int fd, char *command){
 
 
 void read_multiline_command(char buffer[]){
-    int found_CR = FALSE;
-    int found_LF = FALSE;
-    int found_dot = FALSE;
     int ended = FALSE;
 
     if(buffer[0] == '-'){
@@ -36,31 +33,31 @@ void read_multiline_command(char buffer[]){
         char c = buffer[i];
         switch(c){
             case '\r':
-                found_CR = TRUE;
+                state->found_CR = TRUE;
                 break;
             case '\n':
-                if(found_CR){
-                    if(found_dot){
+                if(state->found_CR){
+                    if(state->found_dot){
                         ended = TRUE;
                     }
-                    found_LF = TRUE;
+                    state->found_LF = TRUE;
                 }
             case '.':
-                if(found_CR && found_LF){
-                    found_dot = TRUE;
+                if(state->found_CR && state->found_LF){
+                    state->found_dot = TRUE;
                 }else{
-                    found_dot = FALSE; //Take into account the \r\n..\r\n case
+                    state->found_dot = FALSE; //Take into account the \r\n..\r\n case
                 }
-                found_CR  = FALSE;
-                found_LF  = FALSE;
+                state->found_CR  = FALSE;
+                state->found_LF  = FALSE;
             default: //It isn't any interesting character, so restore everything to default
-                found_CR  = FALSE;
-                found_LF  = FALSE;
-                found_dot = FALSE;
+                state->found_CR  = FALSE;
+                state->found_LF  = FALSE;
+                state->found_dot = FALSE;
         }
 
         if(ended){
-            //STATUS = REQUEST
+            state->state = REQUEST;
         }
     }
 
