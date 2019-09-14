@@ -2,12 +2,14 @@
 #include "CuTest.h"
 
 CuSuite* ConfigUtilGetSuite();
+CuSuite* ParserUtilGetSuite();
 
 void RunAllTests(void){
     CuString *output = CuStringNew();
     CuSuite* suite = CuSuiteNew();
 
     CuSuiteAddSuite(suite, ConfigUtilGetSuite());
+    CuSuiteAddSuite(suite, ParserUtilGetSuite());
 
     CuSuiteRun(suite);
     CuSuiteSummary(suite, output);
