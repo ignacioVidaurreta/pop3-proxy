@@ -42,6 +42,7 @@ void read_multiline_command(char buffer[]){
                     }
                     state->found_LF = TRUE;
                 }
+                break;
             case '.':
                 if(state->found_CR && state->found_LF){
                     state->found_dot = TRUE;
@@ -50,10 +51,12 @@ void read_multiline_command(char buffer[]){
                 }
                 state->found_CR  = FALSE;
                 state->found_LF  = FALSE;
+                break;
             default: //It isn't any interesting character, so restore everything to default
                 state->found_CR  = FALSE;
                 state->found_LF  = FALSE;
                 state->found_dot = FALSE;
+                break;
         }
 
         if(ended){
