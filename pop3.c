@@ -23,10 +23,11 @@
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 #define LOCALHOST "127.0.0.1"
 
-#define TRUE 1
-#define FALSE 0
+
 
 extern struct config *options;
+
+int is_single_line;
 
 int clean_up(int fd, int origin_fd, int failed){
     if(origin_fd != 1){
@@ -77,12 +78,14 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
     //Initial connection to server
     read_from_server(server_fd, response);
     write_response(fd, response);
+    char command[100]; //TODO(Nachito): Change hardcoded size to actual significant value
+    is_single_line = TRUE;
 
     while(!ended){
-        char command[100]; //TODO(Nachito): Change hardcoded size to actual significant value
         memset(response, 0, 100);
         memset(command, 0, 100);
-        read_command(fd, command);
+
+        read_command(fd, command, &is_single_line);
 
         write_to_server(server_fd, command);
         read_from_server(server_fd, response);
