@@ -27,7 +27,9 @@
 
 extern struct config *options;
 
-int is_single_line;
+struct state_manager *state;
+
+
 
 int clean_up(int fd, int origin_fd, int failed){
     if(origin_fd != 1){
@@ -36,6 +38,15 @@ int clean_up(int fd, int origin_fd, int failed){
     close(fd);
 
     return !failed;
+}
+
+void init_state_manager() {
+    state = malloc(sizeof(struct state_manager));
+    state->state = RESPONSE;
+    state->is_single_line = TRUE;
+    state->found_CR = FALSE;
+    state->found_LF = FALSE;
+    state->found_dot = FALSE;
 }
 
 /**
@@ -47,6 +58,7 @@ int clean_up(int fd, int origin_fd, int failed){
 static void POP3_handle_connection(const int fd, const struct sockaddr* clientAddress){
 
     const int server_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    init_state_manager();
 
     if(server_fd < 0){
         fprintf(stderr,"Cannot connect to POP3 server\n");
@@ -74,25 +86,25 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
     }
 
     int ended = FALSE;
-    char response[100];
-    //Initial connection to server
-    read_from_server(server_fd, response);
-    write_response(fd, response);
-    char command[100]; //TODO(Nachito): Change hardcoded size to actual significant value
-    is_single_line = TRUE;
+    char buffer[BUFFER_MAX_SIZE];
 
     while(!ended){
-        memset(response, 0, 100);
-        memset(command, 0, 100);
+        switch(state->state) {
+            case RESPONSE: 
+                memset(buffer,0,BUFFER_MAX_SIZE);
+                read_from_server(server_fd, buffer);
+                parse_response(buffer); //TODO: create function. In charge of defining next state
+                write_response(fd, buffer);//TODO: Change fd 3 client_fd
+                break;
+            case REQUEST:
+                read_command(fd, buffer); 
+                parse_command(buffer);//TODO: create function. Must include a way to leave the fucking place (ended variable). In charge of defining next state
+                write_to_server(server_fd, buffer);
 
-        read_command(fd, command, &is_single_line);
-
-        write_to_server(server_fd, command);
-        read_from_server(server_fd, response);
-        write_response(fd, response);
-
-        if(strcmp(command, "QUIT\n") == 0){
-            ended = TRUE;
+                break;
+            default: 
+                print_error("Perror lel equis deeeee", get_time());
+                break;
         }
     }
     //close(fd);

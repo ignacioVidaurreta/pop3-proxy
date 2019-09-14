@@ -10,4 +10,17 @@
     #define TRUE 1
     #define FALSE 0
 
+    #define RESPONSE 2
+    #define REQUEST 3
+
+    #define BUFFER_MAX_SIZE 512
+
+    struct state_manager {
+    int state;
+    int is_single_line;
+    int found_CR;
+    int found_LF;
+    int found_dot;
+    };
+
 #endif

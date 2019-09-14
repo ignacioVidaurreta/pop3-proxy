@@ -6,14 +6,14 @@
 #include "include/parser.h"
 #include "include/pop3.h"
 
-#define BUFFER_MAX_SIZE 512
+extern struct state_manager *state;
 /**
  *  Reads command from the filedescriptor and saves it to the command buffer
  * 
  * @param fd        proxy-client file descriptor
  * @param command   buffer where the read command will be stored.
  */
-void read_command(int fd, char *command, int * is_single_line){
+void read_command(int fd, char *command){
     int n;
     memset(command, 0, strlen(command));
     if((n = recv(fd, command, 100, 0)) < 0){
@@ -25,12 +25,11 @@ void read_command(int fd, char *command, int * is_single_line){
     sscanf(command,"%s %s", cmd, extra);
 
     if ( strcasecmp(cmd, "RETR") == 0 || strcasecmp(cmd, "LIST") == 0 || strcasecmp(cmd, "CAPA") == 0 || strcasecmp(cmd, "UIDL") == 0 || strcasecmp(cmd, "TOP") == 0) {
-        *is_single_line = FALSE;
+        state->is_single_line = FALSE;
     }
     else
-        *is_single_line = TRUE;
+        state->is_single_line = TRUE;
 
-    fprintf(stdout,"%d \n",*is_single_line);
 }
 
 
@@ -76,4 +75,11 @@ void read_multiline_command(char buffer[]){
         }
     }
 
+}
+
+void parse_response(char* buffer) {
+
+}
+void parse_command(char* buffer) {
+    
 }
