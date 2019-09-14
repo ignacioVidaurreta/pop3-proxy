@@ -18,7 +18,8 @@ void read_from_server(int server_fd, char *response){
 }
 
 void write_to_server(int server_fd, char *cmd){
-    if(send(server_fd, cmd, 100, 0)<0){
+    fprintf(stdout,"%s",cmd);
+    if(send(server_fd, cmd, strlen(cmd), 0)<0){
         perror("Error sending data to server\n");
     }
 
