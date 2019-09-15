@@ -10,7 +10,7 @@
 
 
 void write_response(int fd, char *response){
-    if(send(fd, response, 100, 0)<0){
+    if(send(fd, response, strlen(response), 0)<0){
         perror("Error sending data to client\n");
         return;
     }
