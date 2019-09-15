@@ -29,6 +29,9 @@ void initialize_config(){
     options->proxy_address.sin_addr.s_addr = htonl(INADDR_ANY);
     options->proxy_address.sin_port        = htons(options->local_port);
 
+    options->cmd = malloc(CAT_SIZE*sizeof(char));
+    memcpy(options->cmd, "cat", CAT_SIZE);
+
     /* TODO: Too advanced for the current state of the project
         -> Managment Address
         -> media-types-censurables
@@ -99,13 +102,29 @@ void replace_string(char *previous, char *new){
 
     strncpy(previous, new, strlen(new) +1 );
 }
+
+/**
+ * sets the command for transforming emails.
+ * fails if null.
+ */
+void setCommand(char *cmd, char *newCmd)
+{
+    if (newCmd == NULL)
+    {
+        fprintf(stdout, "Null transformation command");
+        exit(1);
+    }
+    realloc(cmd, sizeof(newCmd));
+    memcpy(cmd, newCmd, sizeof(newCmd));
+}
+
 /**
  *  Parse command line arguments to update configuration.
  */
 void update_config(const int argc, char* const *argv){
     int opt;
 
-    while((opt = getopt(argc, argv, "p:P:o:vhe:l:L:m:M:")) != -1){
+    while((opt = getopt(argc, argv, "p:P:o:vhe:l:L:m:M:t")) != -1){
         switch(opt){
             case 'p':
                 change_port(&options->local_port, optarg);
@@ -139,6 +158,9 @@ void update_config(const int argc, char* const *argv){
                 break;
             case 'M':
                 fprintf(stdout, "WIP");
+                break;
+            case 't':
+                setCommand(options->cmd, optarg);
                 break;
         }
     }

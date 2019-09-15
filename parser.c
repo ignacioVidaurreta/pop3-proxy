@@ -5,6 +5,7 @@
 #include <strings.h>
 #include "include/pop3.h"
 #include "include/parser.h"
+#include "include/transformations.h"
 
 /**
  *  Reads command from the filedescriptor and saves it to the command buffer
@@ -74,18 +75,31 @@ void parse_response(char* buffer, struct state_manager* state) {
         else{
             state->state = REQUEST;
         }
-    }else{
+    } else {
         read_multiline_command(buffer, state);
     }
 
 }
+
+void transform_response(char* buffer, struct state_manager* state) {
+    int* fds = create_process();
+    write_buffer(buffer, fds[1]);
+    read_transformation(buffer, fds[0]);
+}
+
 void parse_command(char* buffer, struct state_manager* state) {
     char cmd[8], extra[64];
     sscanf(buffer,"%s %s", cmd, extra);
 
-    if (strcasecmp(cmd, "RETR") == 0 || strcasecmp(cmd, "LIST") == 0 || strcasecmp(cmd, "CAPA") == 0 || strcasecmp(cmd, "UIDL") == 0 || strcasecmp(cmd, "TOP") == 0) {
-        state->is_single_line = FALSE;
+    if (strcasecmp(cmd, "RETR") == 0 ||
+        strcasecmp(cmd, "LIST") == 0 ||
+        strcasecmp(cmd, "CAPA") == 0 ||
+        strcasecmp(cmd, "UIDL") == 0 ||
+        strcasecmp(cmd, "TOP") == 0) {
+            state->is_single_line = FALSE;
     }
     else
         state->is_single_line = TRUE;
+    if(strcasecmp(cmd, "RETR") == 0)
+        state->state = FILTER;
 }
