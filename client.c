@@ -6,6 +6,7 @@
 #include "include/client.h"
 #include "include/config.h"
 #include "include/logger.h"
+#include "include/buffer.h"
 
 
 void write_response(int fd, char *response){
@@ -17,4 +18,11 @@ void write_response(int fd, char *response){
         logger(WARNING, "Origin returned error response. Awaiting next command from client.", get_time());
     }
         
+}
+
+void write_response_from_buffer(int fd, struct buffer_t *buff){
+    if(send(fd, buff->buffer, buff->curr_length, 0)<0){
+        perror("Error sending data to client\n");
+        return;
+    }
 }

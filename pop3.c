@@ -19,6 +19,7 @@
 #include "include/client.h"
 #include "include/config.h"
 #include "include/logger.h"
+#include "include/buffer.h"
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 #define LOCALHOST "127.0.0.1"
@@ -98,7 +99,7 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
                     read_multiline_command(expandable_buffer->buffer, expandable_buffer->write_pointer, expandable_buffer->curr_length);
                     expandable_buffer->write_pointer+=chars_read;
                     if(state->state == REQUEST){
-                        write_response(fd, expandable_buffer->buffer);
+                        write_response_from_buffer(fd, expandable_buffer);
                         expandable_buffer = init_buffer();
                         //free_buffer(expandable_buffer);
                     }else{
