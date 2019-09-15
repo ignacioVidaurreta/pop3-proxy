@@ -16,5 +16,4 @@ void write_response(int fd, char *response){
     if (!strstr(response, "+OK")){
         logger(WARNING, "Origin returned error response. Awaiting next command from client.", get_time());
     }
-        
 }

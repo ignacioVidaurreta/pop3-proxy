@@ -27,10 +27,6 @@
 
 extern struct config *options;
 
-struct state_manager *state;
-
-
-
 int clean_up(int fd, int origin_fd, int failed){
     if(origin_fd != 1){
         close(origin_fd);
@@ -40,13 +36,14 @@ int clean_up(int fd, int origin_fd, int failed){
     return !failed;
 }
 
-void init_state_manager() {
-    state = malloc(sizeof(struct state_manager));
+struct state_manager* init_state_manager() {
+    struct state_manager* state = malloc(sizeof(struct state_manager));
     state->state = RESPONSE;
     state->is_single_line = TRUE;
     state->found_CR = FALSE;
     state->found_LF = FALSE;
     state->found_dot = FALSE;
+    return state;
 }
 
 /**
@@ -58,7 +55,7 @@ void init_state_manager() {
 static void POP3_handle_connection(const int fd, const struct sockaddr* clientAddress){
     logger(INFO, "Connection established with a client.", get_time());
     const int server_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    init_state_manager();
+    struct state_manager* state = init_state_manager();
 
     if(server_fd < 0){
         fprintf(stderr,"Cannot connect to POP3 server\n");
@@ -93,18 +90,19 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
             case RESPONSE: 
                 memset(buffer,0,BUFFER_MAX_SIZE);
                 read_from_server(server_fd, buffer);
-                parse_response(buffer);
+                parse_response(buffer, state);
                 write_response(fd, buffer);//TODO: Rename fd 3 client_fd
             case REQUEST:
                 read_command(fd, buffer); 
-                parse_command(buffer);
-                write_to_server(server_fd, buffer);
+                parse_command(buffer, state);
+                write_to_server(server_fd, buffer, state);
                 break;
             default: 
-                print_error("Proxy entered into invalid state.", get_time());
+                print_error("Proxy entered into an invalid state.", get_time());
                 break;
         }
     }
+    
     //close(fd);
     //close(server_fd);
 }

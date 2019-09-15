@@ -3,8 +3,8 @@
 #include <string.h>
 #include <sys/socket.h>
 
-#include "include/server.h"
 #include "include/pop3.h"
+#include "include/server.h"
 
 extern struct state_manager* state;
 
@@ -21,7 +21,7 @@ void read_from_server(int server_fd, char *response){
 
 }
 
-void write_to_server(int server_fd, char *cmd){
+void write_to_server(int server_fd, char *cmd, struct state_manager* state){
     if(send(server_fd, cmd, strlen(cmd), 0)<0){
         perror("Error sending data to server\n");
     }
