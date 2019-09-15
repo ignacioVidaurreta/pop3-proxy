@@ -4,7 +4,7 @@
 #include <time.h>
 
 
-enum level {INFO, DEBUG, WARNING, ERROR};
+enum level {INFO, DEBUG, WARNING, ERROR, METRICS};
 
 struct log_message {
     enum level msg_level;

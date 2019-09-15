@@ -16,6 +16,8 @@ char *get_level_string(enum level msg_level){
             return "[ ERROR ]";
         case DEBUG:
             return "[ DEBUG ]";
+        case METRICS:
+            return "[ METRICS ]";
         default:
             return NULL;
     }

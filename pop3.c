@@ -19,17 +19,16 @@
 #include "include/client.h"
 #include "include/config.h"
 #include "include/logger.h"
+#include "include/metrics.h"
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 #define LOCALHOST "127.0.0.1"
 
-
-
 extern struct config *options;
 
-struct state_manager *state;
+extern struct metrics_manager *metrics;
 
-struct metrics_manager * metrics;
+struct state_manager *state;
 
 int clean_up(int fd, int origin_fd, int failed){
     if(origin_fd != 1){
@@ -50,13 +49,6 @@ struct state_manager* init_state_manager() {
     return state;
 }
 
-void init_metrics_manager() {
-    metrics = malloc(sizeof(struct metrics_manager));
-    metrics->concurrent_connections = 0;
-    metrics->number_of_connections = 0;
-    metrics->transfered_bytes = 0;
-}
-
 /**
  * maneja cada conexión entrante
  *
@@ -64,10 +56,10 @@ void init_metrics_manager() {
  * @param caddr  información de la conexiónentrante.
  */
 static void POP3_handle_connection(const int fd, const struct sockaddr* clientAddress){
-    logger(INFO, "Connection established with a client.", get_time());
+    logger(INFO, "Connection established with a client", get_time());
     const int server_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
     struct state_manager* state = init_state_manager();
-    init_metrics_manager();
 
     if(server_fd < 0){
         fprintf(stderr,"Cannot connect to POP3 server\n");
@@ -110,16 +102,17 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
                 write_to_server(server_fd, buffer, state);
                 break;
             default: 
-                print_error("Proxy entered into an invalid state.", get_time());
+                print_error("Proxy entered into invalid state", get_time());
                 break;
         }
     }
 
-    print_metrics();
+    logger(INFO, "Connection finished with a client", get_time());
+    logger(METRICS, get_metrics(), get_time());
     free_resources();
-    close(fd);
-    close(server_fd);
-    exit(0);
+    //close(fd);
+    //close(server_fd);
+    //exit(0);
 }
 
 /**
@@ -172,16 +165,10 @@ int serve_POP3_concurrent_blocking(const int server){
                     POP3_handle_connection(client, (struct sockaddr*)&client_address);
                 }
             }
-            //free(c); TODO: esto rompe el tp pero habria que liberar la connection. O no ...
         }
     }
 }
 
 void free_resources() {
     free(state);
-}
-
-void print_metrics() {
-    fprintf(stdout,"\n[METRICS]\nconcurrent_connections: %d\nnumber_of_connections: %d\ntransfered_bytes: %d\n",metrics->concurrent_connections,
-    metrics->number_of_connections, metrics->transfered_bytes);
 }
