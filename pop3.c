@@ -27,13 +27,10 @@
 
 extern struct config *options;
 
-<<<<<<< HEAD
-=======
 struct state_manager *state;
 
 struct metrics_manager * metrics;
 
->>>>>>> e7d598ac299f2e5efa3750e3fee332ec5eec2d36
 int clean_up(int fd, int origin_fd, int failed){
     if(origin_fd != 1){
         close(origin_fd);
@@ -69,12 +66,8 @@ void init_metrics_manager() {
 static void POP3_handle_connection(const int fd, const struct sockaddr* clientAddress){
     logger(INFO, "Connection established with a client.", get_time());
     const int server_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-<<<<<<< HEAD
     struct state_manager* state = init_state_manager();
-=======
-    init_state_manager();
     init_metrics_manager();
->>>>>>> e7d598ac299f2e5efa3750e3fee332ec5eec2d36
 
     if(server_fd < 0){
         fprintf(stderr,"Cannot connect to POP3 server\n");
@@ -121,18 +114,12 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
                 break;
         }
     }
-<<<<<<< HEAD
-    
-    //close(fd);
-    //close(server_fd);
-=======
 
     print_metrics();
     free_resources();
     close(fd);
     close(server_fd);
     exit(0);
->>>>>>> e7d598ac299f2e5efa3750e3fee332ec5eec2d36
 }
 
 /**
