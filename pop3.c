@@ -85,10 +85,9 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
         return;
     }
 
-    int ended = FALSE;
     char buffer[BUFFER_MAX_SIZE];
 
-    while(!ended){
+    while(state->state != END){
         switch(state->state) {
             case RESPONSE: 
                 memset(buffer,0,BUFFER_MAX_SIZE);
@@ -105,8 +104,11 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
                 break;
         }
     }
-    //close(fd);
-    //close(server_fd);
+
+    free_resources();
+    close(fd);
+    close(server_fd);
+    exit(0);
 }
 
 /**
@@ -159,6 +161,11 @@ int serve_POP3_concurrent_blocking(const int server){
                     POP3_handle_connection(client, (struct sockaddr*)&client_address);
                 }
             }
+            //free(c); TODO: esto rompe el tp pero habria que liberar la connection. O no ...
         }
     }
+}
+
+void free_resources() {
+    free(state);
 }

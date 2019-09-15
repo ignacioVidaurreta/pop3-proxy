@@ -69,7 +69,12 @@ void read_multiline_command(char buffer[]){
 
 void parse_response(char* buffer) {
     if(state->is_single_line){
-        state->state = REQUEST;
+        if(strcmp(buffer, "+OK Logging out\r\n") == 0) {
+            state->state = END;
+        }
+        else{
+            state->state = REQUEST;
+        }
     }else{
         read_multiline_command(buffer);
     }
@@ -79,7 +84,7 @@ void parse_command(char* buffer) {
     char cmd[8], extra[64];
     sscanf(buffer,"%s %s", cmd, extra);
 
-    if ( strcasecmp(cmd, "RETR") == 0 || strcasecmp(cmd, "LIST") == 0 || strcasecmp(cmd, "CAPA") == 0 || strcasecmp(cmd, "UIDL") == 0 || strcasecmp(cmd, "TOP") == 0) {
+    if (strcasecmp(cmd, "RETR") == 0 || strcasecmp(cmd, "LIST") == 0 || strcasecmp(cmd, "CAPA") == 0 || strcasecmp(cmd, "UIDL") == 0 || strcasecmp(cmd, "TOP") == 0) {
         state->is_single_line = FALSE;
     }
     else
