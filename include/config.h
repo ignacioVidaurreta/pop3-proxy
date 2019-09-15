@@ -30,6 +30,13 @@ struct config {
     // Current version of the program
     char *version;
 
+    /*
+     *  This variable defines if when parsing an email, we should parse it in
+     *  small chunks (parse_completely = FALSE) or save everything in a buffer
+     *  and then parse it (parse_completely = TRUE). This depends on which 
+     *  transformation function you are using.
+     */
+    int parse_completely;
 
 };
 

@@ -86,7 +86,7 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
         print_error("Connection to POP3 Server failed", get_time());
         return;
     }
-    int flag = TRUE;
+
     char buffer[BUFFER_MAX_SIZE];
     struct buffer_t *expandable_buffer;
     expandable_buffer = init_buffer();
@@ -95,7 +95,7 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
     while(state->state != END){
         switch(state->state) {
             case RESPONSE:
-                if(!state->is_single_line && flag){
+                if(!state->is_single_line && options->parse_completely){
                     int chars_read = read_from_server(server_fd, expandable_buffer->buffer + expandable_buffer->write_pointer);
                     read_multiline_command(expandable_buffer->buffer, expandable_buffer->write_pointer, expandable_buffer->curr_length, state);
                     expandable_buffer->write_pointer+=chars_read;

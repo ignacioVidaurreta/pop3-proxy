@@ -6,6 +6,7 @@
 #include <getopt.h>
 
 #include "include/config.h"
+#include "include/pop3.h"
 
 struct config* options; 
 
@@ -18,16 +19,19 @@ void initialize_config(){
     options->local_port      = 1110;
     options->origin_port     = 110;
     options->management_port = 9090;
-
-    options->error_file      = "/dev/null";
+    
     options->replacement_message = (char *) calloc(250, sizeof(char));
     strcpy(options->replacement_message, "Parte reemplaza");
-    options->version = "1.0";
+
+    options->error_file       = "/dev/null";    
+    options->version          = "1.0";
+    options->parse_completely = FALSE;
 
     memset(&(options->proxy_address), 0, sizeof(options->proxy_address));
     options->proxy_address.sin_family      = AF_INET;
     options->proxy_address.sin_addr.s_addr = htonl(INADDR_ANY);
     options->proxy_address.sin_port        = htons(options->local_port);
+
 
     /* TODO: Too advanced for the current state of the project
         -> Managment Address
@@ -41,7 +45,7 @@ void print_usage(char *cmd_name){
     fprintf(stdout, "Usage: %s -h for help\n", cmd_name);
     fprintf(stdout, "Usage: %s -v to print version\n", cmd_name);
     fprintf(stdout, "Usage: %s \t [-e ERROR_FILE]\n", cmd_name);
-    fprintf(stdout, "\t\t [-h ]\n");
+    fprintf(stdout, "\t\t [-c (TRUE: Enables complete Parse / False: Disables complete parse)] \n");
     fprintf(stdout, "\t\t [-l POP3_ADDRESS ]\n");
     fprintf(stdout, "\t\t [-L MANAGEMENT_ADDRESS ]\n");
     fprintf(stdout, "\t\t [-m REPLACEMENT_MESSAGE ]\n");
