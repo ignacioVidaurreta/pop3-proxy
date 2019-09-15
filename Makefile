@@ -1,28 +1,30 @@
 CC = gcc
 CFLAGS = -pthread -std=c99 -pedantic -Wall
 FILES = main.c pop3.c parser.c server.c client.c config.c logger.c
+GREEN = \e[92m
+NORMAL = \e[0m
 all:
-	@echo "Compiling ..."
+	@echo "$(GREEN)Compiling ...$(NORMAL)"
 	$(CC) $(CFLAGS) $(FILES) -o run
-	@echo "Done!"
+	@echo "$(GREEN)Done!$(NORMAL)"
 
 debug:
-	@echo "Compiling in debug mode ..."
+	@echo "$(GREEN)Compiling in debug mode ...$(NORMAL)"
 	$(CC) -g $(CFLAGS) $(FILES) -o run_debug
-	@echo "Done!"
+	@echo "$(GREEN)Done!$(NORMAL)"
 
 
 clean:
-	@echo "Cleaning up ..."
+	@echo "$(GREEN)Cleaning up ...$(NORMAL)"
 	rm -f run run_debug tests/a.out
-	@echo "Done!"
+	@echo "$(GREEN)Done!$(NORMAL)"
 
 test: all
-	@echo "Running tests!"
+	@echo "$(GREEN)Running tests!$(NORMAL)"
 	@tar -zcvf test_zip.tar *.c include/*
 	mv test_zip.tar tests/
 	$(MAKE) -C tests/
-	@echo "Done!"
+	@echo "$(GREEN)Done!$(NORMAL)"
 
 run: all
 	@./run
