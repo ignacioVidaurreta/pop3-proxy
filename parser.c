@@ -3,10 +3,9 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <strings.h>
-#include "include/parser.h"
 #include "include/pop3.h"
+#include "include/parser.h"
 
-extern struct state_manager *state;
 /**
  *  Reads command from the filedescriptor and saves it to the command buffer
  * 
@@ -22,7 +21,7 @@ void read_command(int fd, char *command){
 }
 
 
-void read_multiline_command(char buffer[], int start, int end){
+void read_multiline_command(char buffer[], int start, int end, struct state_manager* state){
     int ended = FALSE;
 
     if(buffer[0] == '-'){
@@ -67,20 +66,20 @@ void read_multiline_command(char buffer[], int start, int end){
 
 }
 
-void parse_response(char* buffer) {
+void parse_response(char* buffer, struct state_manager* state) {
     if(state->is_single_line){
-        if(strcmp(buffer, "+OK Logging out\r\n") == 0) {
+        if(strcmp(buffer, "+OK Logging out\r\n") == 0 || strcmp(buffer, "+OK Logging out.\r\n") == 0) {
             state->state = END;
         }
         else{
             state->state = REQUEST;
         }
     }else{
-        read_multiline_command(buffer, 0, BUFFER_MAX_SIZE);
+        read_multiline_command(buffer, 0, BUFFER_MAX_SIZE, state);
     }
 
 }
-void parse_command(char* buffer) {
+void parse_command(char* buffer, struct state_manager* state) {
     char cmd[8], extra[64];
     sscanf(buffer,"%s %s", cmd, extra);
 
