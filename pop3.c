@@ -121,7 +121,7 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
                     memset(buffer,0,BUFFER_MAX_SIZE);
                     read_from_server(server_fd, buffer);
                     parse_response(buffer, state);
-                    //transform_response(buffer, state);
+                    transform_response(buffer, state);
                     write_response(fd, buffer, state);
                 }
                 break;

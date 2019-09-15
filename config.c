@@ -117,8 +117,8 @@ void setCommand(char *cmd, char *newCmd)
         fprintf(stdout, "Null transformation command");
         exit(1);
     }
-    realloc(cmd, sizeof(newCmd));
-    memcpy(cmd, newCmd, sizeof(newCmd));
+    cmd = realloc(cmd, strlen(newCmd));
+    memcpy(cmd, newCmd, strlen(newCmd));
 }
 
 /**
