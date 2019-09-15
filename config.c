@@ -13,7 +13,7 @@ struct config* options;
  *  Initialize configuration structure with default values
  */
 void initialize_config(){
-    options = malloc(sizeof(*options));
+    options = malloc(sizeof(*options)); //TODO: free in right place
 
     options->local_port      = 1110;
     options->origin_port     = 110;
