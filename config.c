@@ -109,7 +109,7 @@ void replace_string(char *previous, char *new){
 void update_config(const int argc, char* const *argv){
     int opt;
 
-    while((opt = getopt(argc, argv, "p:P:o:vhe:l:L:m:M:")) != -1){
+    while((opt = getopt(argc, argv, "p:P:o:c:vhe:l:L:m:M:")) != -1){
         switch(opt){
             case 'p':
                 change_port(&options->local_port, optarg);
@@ -121,6 +121,9 @@ void update_config(const int argc, char* const *argv){
             case 'o':
                 change_port(&options->management_port, optarg);
                 break;
+            case 'c':
+                if(strcmp(optarg, TRUE) == 0)
+                    options->parse_completely = TRUE;
             case 'e':
                 change_error_file(optarg);
                 break;
