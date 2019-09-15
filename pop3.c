@@ -29,7 +29,7 @@ extern struct config *options;
 
 struct state_manager *state;
 
-
+struct metrics_manager * metrics;
 
 int clean_up(int fd, int origin_fd, int failed){
     if(origin_fd != 1){
@@ -49,6 +49,13 @@ void init_state_manager() {
     state->found_dot = FALSE;
 }
 
+void init_metrics_manager() {
+    metrics = malloc(sizeof(struct metrics_manager));
+    metrics->concurrent_connections = 0;
+    metrics->number_of_connections = 0;
+    metrics->transfered_bytes = 0;
+}
+
 /**
  * maneja cada conexión entrante
  *
@@ -59,6 +66,7 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
     logger(INFO, "Connection established with a client.", get_time());
     const int server_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     init_state_manager();
+    init_metrics_manager();
 
     if(server_fd < 0){
         fprintf(stderr,"Cannot connect to POP3 server\n");
@@ -89,11 +97,12 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
 
     while(state->state != END){
         switch(state->state) {
-            case RESPONSE: 
+            case RESPONSE:
                 memset(buffer,0,BUFFER_MAX_SIZE);
                 read_from_server(server_fd, buffer);
                 parse_response(buffer);
                 write_response(fd, buffer);//TODO: Rename fd 3 client_fd
+                break;
             case REQUEST:
                 read_command(fd, buffer); 
                 parse_command(buffer);
@@ -105,6 +114,7 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
         }
     }
 
+    print_metrics();
     free_resources();
     close(fd);
     close(server_fd);
@@ -168,4 +178,9 @@ int serve_POP3_concurrent_blocking(const int server){
 
 void free_resources() {
     free(state);
+}
+
+void print_metrics() {
+    fprintf(stdout,"\n[METRICS]\nconcurrent_connections: %d\nnumber_of_connections: %d\ntransfered_bytes: %d\n",metrics->concurrent_connections,
+    metrics->number_of_connections, metrics->transfered_bytes);
 }
