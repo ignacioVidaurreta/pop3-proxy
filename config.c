@@ -6,6 +6,7 @@
 #include <getopt.h>
 
 #include "include/config.h"
+#include "include/pop3.h"
 
 struct config* options; 
 
@@ -18,11 +19,13 @@ void initialize_config(){
     options->local_port      = 1110;
     options->origin_port     = 110;
     options->management_port = 9090;
-
-    options->error_file      = "/dev/null";
+    
     options->replacement_message = (char *) calloc(250, sizeof(char));
     strcpy(options->replacement_message, "Parte reemplaza");
-    options->version = "1.0";
+
+    options->error_file       = "/dev/null";    
+    options->version          = "1.0";
+    options->parse_completely = FALSE;
 
     memset(&(options->proxy_address), 0, sizeof(options->proxy_address));
     options->proxy_address.sin_family      = AF_INET;
@@ -44,7 +47,7 @@ void print_usage(char *cmd_name){
     fprintf(stdout, "Usage: %s -h for help\n", cmd_name);
     fprintf(stdout, "Usage: %s -v to print version\n", cmd_name);
     fprintf(stdout, "Usage: %s \t [-e ERROR_FILE]\n", cmd_name);
-    fprintf(stdout, "\t\t [-h ]\n");
+    fprintf(stdout, "\t\t [-c (TRUE: Enables complete Parse / False: Disables complete parse)] \n");
     fprintf(stdout, "\t\t [-l POP3_ADDRESS ]\n");
     fprintf(stdout, "\t\t [-L MANAGEMENT_ADDRESS ]\n");
     fprintf(stdout, "\t\t [-m REPLACEMENT_MESSAGE ]\n");
@@ -124,7 +127,7 @@ void setCommand(char *cmd, char *newCmd)
 void update_config(const int argc, char* const *argv){
     int opt;
 
-    while((opt = getopt(argc, argv, "p:P:o:vhe:l:L:m:M:t")) != -1){
+    while((opt = getopt(argc, argv, "p:P:o:c:vhe:l:L:m:M:t")) != -1){
         switch(opt){
             case 'p':
                 change_port(&options->local_port, optarg);
@@ -136,6 +139,9 @@ void update_config(const int argc, char* const *argv){
             case 'o':
                 change_port(&options->management_port, optarg);
                 break;
+            case 'c':
+                if(strcmp(optarg, "True") == 0)
+                    options->parse_completely = TRUE;
             case 'e':
                 change_error_file(optarg);
                 break;

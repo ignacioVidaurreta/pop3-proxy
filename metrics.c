@@ -18,3 +18,16 @@ char * get_metrics() {
     metrics->number_of_connections, metrics->transfered_bytes);
     return aux;
 }
+
+void update_metrics_new_connection() {
+     metrics->number_of_connections++;
+     metrics->concurrent_connections++;
+ }
+
+ void update_metrics_end_connection() {
+     metrics->concurrent_connections--;
+ }
+
+ void update_metrics_transfered_bytes(int n) {
+     metrics->transfered_bytes += n;
+ }

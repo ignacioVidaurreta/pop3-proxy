@@ -22,7 +22,7 @@ void read_command(int fd, char *command){
 }
 
 
-void read_multiline_command(char* buffer, struct state_manager* state){
+void read_multiline_command(char buffer[], int start, int end, struct state_manager* state){
     int ended = FALSE;
 
     if(buffer[0] == '-'){
@@ -30,7 +30,7 @@ void read_multiline_command(char* buffer, struct state_manager* state){
         return; //Do not parse, it's actually single line
     }
 
-    for(int i = 0; i < BUFFER_MAX_SIZE && !ended; i++){
+    for(int i = start; i < end && !ended; i++){
         char c = buffer[i];
         switch(c){
             case '\r':
@@ -75,8 +75,8 @@ void parse_response(char* buffer, struct state_manager* state) {
         else{
             state->state = REQUEST;
         }
-    } else {
-        read_multiline_command(buffer, state);
+    }else{
+        read_multiline_command(buffer, 0, BUFFER_MAX_SIZE, state);
     }
 
 }

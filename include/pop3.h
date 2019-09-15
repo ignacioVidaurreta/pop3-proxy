@@ -1,6 +1,7 @@
 #ifndef POP3__H
 #define POP3__H
 
+    #include "buffer.h"
     extern struct config* options;
     
     int clean_up(int fd, int originFd, int failed);
@@ -18,7 +19,6 @@
         END = 3,
     };
 
-    #define BUFFER_MAX_SIZE 512
 
     struct state_manager {
         enum POP3_STATE state;
