@@ -1,6 +1,7 @@
 #ifndef POP3__H
 #define POP3__H
 
+    #include "buffer.h"
     extern struct config* options;
     
     int clean_up(int fd, int originFd, int failed);
@@ -15,7 +16,6 @@
     #define REQUEST 3
     #define END 4
 
-    #define BUFFER_MAX_SIZE 512
 
     struct state_manager {
     int state;

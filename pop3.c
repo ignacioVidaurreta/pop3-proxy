@@ -19,6 +19,7 @@
 #include "include/client.h"
 #include "include/config.h"
 #include "include/logger.h"
+#include "include/buffer.h"
 #include "include/metrics.h"
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
@@ -85,16 +86,32 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
         print_error("Connection to POP3 Server failed", get_time());
         return;
     }
-
+    int flag = TRUE;
     char buffer[BUFFER_MAX_SIZE];
+    struct buffer_t *expandable_buffer;
+    expandable_buffer = init_buffer();
+
 
     while(state->state != END){
         switch(state->state) {
             case RESPONSE:
-                memset(buffer,0,BUFFER_MAX_SIZE);
-                read_from_server(server_fd, buffer);
-                parse_response(buffer, state);
-                write_response(fd, buffer, state);//TODO: Rename fd 3 client_fd
+                if(!state->is_single_line && flag){
+                    int chars_read = read_from_server(server_fd, expandable_buffer->buffer + expandable_buffer->write_pointer);
+                    read_multiline_command(expandable_buffer->buffer, expandable_buffer->write_pointer, expandable_buffer->curr_length, state);
+                    expandable_buffer->write_pointer+=chars_read;
+                    if(state->state == REQUEST){
+                        write_response_from_buffer(fd, expandable_buffer);
+                        expandable_buffer = init_buffer();
+                        //free_buffer(expandable_buffer);
+                    }else{
+                        expand_buffer(expandable_buffer);
+                    }
+                }else{
+                    memset(buffer,0,BUFFER_MAX_SIZE);
+                    read_from_server(server_fd, buffer);
+                    parse_response(buffer,state);
+                    write_response(fd, buffer, state);//TODO: Rename fd 3 client_fd
+                }
                 break;
             case REQUEST:
                 read_command(fd, buffer); 
