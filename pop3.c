@@ -56,7 +56,7 @@ void init_state_manager() {
  * @param caddr  información de la conexiónentrante.
  */
 static void POP3_handle_connection(const int fd, const struct sockaddr* clientAddress){
-
+    logger(INFO, "Connection established with a client.", get_time());
     const int server_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     init_state_manager();
 
@@ -94,15 +94,14 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
                 memset(buffer,0,BUFFER_MAX_SIZE);
                 read_from_server(server_fd, buffer);
                 parse_response(buffer);
-                write_response(fd, buffer);//TODO: Change fd 3 client_fd
-                break;
+                write_response(fd, buffer);//TODO: Rename fd 3 client_fd
             case REQUEST:
                 read_command(fd, buffer); 
                 parse_command(buffer);
                 write_to_server(server_fd, buffer);
                 break;
             default: 
-                print_error("Perror lel equis deeeee", get_time());
+                print_error("Proxy entered into invalid state.", get_time());
                 break;
         }
     }
