@@ -9,7 +9,7 @@
 
 #define TEST_STR_1 "Hello World\r\n How are you \r\n \r\n.\r\n"
 
-int read_multiline_command(char buffer[]){
+int read_multiline_commands(char buffer[]){
     int found_CR = FALSE;
     int found_LF = FALSE;
     int found_dot = FALSE;
@@ -60,7 +60,7 @@ void test_parse_test(CuTest *tc){
 
     strncpy(str, TEST_STR_1, strlen(TEST_STR_1));
 
-    int ret_value = read_multiline_command(str);
+    int ret_value = read_multiline_commands(str);
 
     CuAssertIntEquals(tc, TRUE, ret_value);
 
@@ -72,7 +72,7 @@ void test_server_returns_error(CuTest *tc){
 
     strncpy(str, "-asdas sadasdsad", strlen("-asdas sadasdsad"));
 
-    int ret_value = read_multiline_command(str);
+    int ret_value = read_multiline_commands(str);
 
     CuAssertIntEquals(tc, -1, ret_value);
 }

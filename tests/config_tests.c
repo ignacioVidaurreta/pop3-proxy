@@ -2,16 +2,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include "CuTest.h"
+#include "tmp/include/config.h"
 
-void replace_string(char *previous, char *new){
-    char *tmp = realloc(previous, strlen(new)+1);
-    if( tmp == NULL){
-        fprintf(stdout, "Memory Error: Couldn't reallocate");
-        exit(1);
-    }
+// void replace_string(char *previous, char *new){
+//     char *tmp = realloc(previous, strlen(new)+1);
+//     if( tmp == NULL){
+//         fprintf(stdout, "Memory Error: Couldn't reallocate");
+//         exit(1);
+//     }
 
-    strncpy(previous, new, strlen(new) +1 );
-}
+//     strncpy(previous, new, strlen(new) +1 );
+// }
 
 
 void test_replace_string(CuTest *tc){

@@ -19,8 +19,9 @@ clean:
 
 test: all
 	@echo "Running tests!"
-	gcc tests/AllTests.c tests/CuTest.c tests/config_tests.c
-	@./a.out
+	@tar -zcvf test_zip.tar *.c include/*
+	mv test_zip.tar tests/
+	$(MAKE) -C tests/
 	@echo "Done!"
 
 run: all
