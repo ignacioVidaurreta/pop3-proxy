@@ -3,6 +3,9 @@
 
 void init_metrics_manager();
 char* get_metrics();
+void update_metrics_new_connection();
+void update_metrics_end_connection();
+void update_metrics_transfered_bytes(int n);
 
 struct metrics_manager {
 int concurrent_connections;

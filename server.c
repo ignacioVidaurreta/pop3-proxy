@@ -6,6 +6,7 @@
 #include "include/pop3.h"
 #include "include/buffer.h"
 #include "include/server.h"
+#include "include/metrics.h"
 
 extern struct state_manager* state;
 
@@ -14,6 +15,7 @@ extern struct state_manager* state;
  * Read output from server
  * 
  */
+
 int read_from_server(int server_fd, char *response){
     int chars_read;
     if((chars_read=recv(server_fd, response, BUFFER_MAX_SIZE, 0))<0){
@@ -24,9 +26,10 @@ int read_from_server(int server_fd, char *response){
 }
 
 void write_to_server(int server_fd, char *cmd, struct state_manager* state){
-    if(send(server_fd, cmd, strlen(cmd), 0)<0){
+    int n;
+    if((n = send(server_fd, cmd, strlen(cmd), 0)) < 0){
         perror("Error sending data to server\n");
     }
+    update_metrics_transfered_bytes(n);
     state->state = RESPONSE;
-
 }

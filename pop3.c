@@ -123,7 +123,8 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
                 break;
         }
     }
-
+    
+    update_metrics_end_connection();
     logger(INFO, "Connection finished with a client", get_time());
     logger(METRICS, get_metrics(), get_time());
     free_resources();
@@ -152,7 +153,6 @@ void* handle_connection_pthread(void* args){
 
     POP3_handle_connection(c-> fd, (struct sockaddr*) &c->addr);
     free(args);
-
     return 0;
 }
 
@@ -167,6 +167,7 @@ int serve_POP3_concurrent_blocking(const int server){
         if( client < 0){
             print_error("Unable to accept incoming socket", get_time());
         }else{
+            update_metrics_new_connection();
             struct connection* c = malloc(sizeof(struct connection));
             if (c == NULL){
                 // lo trabajamos iterativamente

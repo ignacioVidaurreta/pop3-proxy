@@ -122,7 +122,7 @@ void update_config(const int argc, char* const *argv){
                 change_port(&options->management_port, optarg);
                 break;
             case 'c':
-                if(strcmp(optarg, TRUE) == 0)
+                if(strcmp(optarg, "True") == 0)
                     options->parse_completely = TRUE;
             case 'e':
                 change_error_file(optarg);
