@@ -82,9 +82,11 @@ void parse_response(char* buffer, struct state_manager* state) {
 }
 
 void transform_response(char* buffer, struct state_manager* state) {
+    /*
     int* fds = create_process();
     write_buffer(buffer, fds[1]);
     read_transformation(buffer, fds[0]);
+    */
 }
 
 void parse_command(char* buffer, struct state_manager* state) {

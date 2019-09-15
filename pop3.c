@@ -95,7 +95,18 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
     while(state->state != END){
         switch(state->state) {
             case RESPONSE:
-                if(!state->is_single_line && options->parse_completely){
+                memset(buffer,0,BUFFER_MAX_SIZE);
+                read_from_server(server_fd, buffer);
+                parse_response(buffer,state);
+                write_response(fd, buffer, state);//TODO: Rename fd 3 client_fd
+                break;
+            case REQUEST:
+                read_command(fd, buffer); 
+                parse_command(buffer, state);
+                write_to_server(server_fd, buffer, state);
+                break;
+            case FILTER:
+                if(options->parse_completely){
                     int chars_read = read_from_server(server_fd, expandable_buffer->buffer + expandable_buffer->write_pointer);
                     read_multiline_command(expandable_buffer->buffer, expandable_buffer->write_pointer, expandable_buffer->curr_length, state);
                     expandable_buffer->write_pointer+=chars_read;
@@ -109,21 +120,10 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
                 }else{
                     memset(buffer,0,BUFFER_MAX_SIZE);
                     read_from_server(server_fd, buffer);
-                    parse_response(buffer,state);
-                    write_response(fd, buffer, state);//TODO: Rename fd 3 client_fd
+                    parse_response(buffer, state);
+                    //transform_response(buffer, state);
+                    write_response(fd, buffer, state);
                 }
-                break;
-            case REQUEST:
-                read_command(fd, buffer); 
-                parse_command(buffer, state);
-                write_to_server(server_fd, buffer, state);
-                break;
-            case FILTER:
-                memset(buffer,0,BUFFER_MAX_SIZE);
-                read_from_server(server_fd, buffer);
-                parse_response(buffer, state);
-                transform_response(buffer, state);
-                write_response(fd, buffer, state);
                 break;
             default: 
                 print_error("Proxy entered into invalid state", get_time());
