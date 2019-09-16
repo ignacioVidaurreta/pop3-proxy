@@ -135,9 +135,8 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
     logger(INFO, "Connection finished with a client", get_time());
     logger(METRICS, get_metrics(), get_time());
     free_resources();
-    //close(fd);
-    //close(server_fd);
-    //exit(0);
+
+    close(server_fd);
 }
 
 /**

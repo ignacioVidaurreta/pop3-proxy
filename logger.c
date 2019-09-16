@@ -45,12 +45,20 @@ void write_log(struct log_message* log){
         perror("Error writing log");
         return;
     }
-    fprintf(stdout, "[%s] %s\t%s\n", log->timestamp,level, log->message);
+    char* color_modifier;
+    if(log->msg_level == ERROR){
+        color_modifier = "\033[0;31m"; //RED
+    }else if(log->msg_level == WARNING){
+        color_modifier = "\033[0;33m"; //YELLOW
+    }else{
+        color_modifier = "\033[0;36m"; //CYAN
+    }
+    fprintf(stdout, "%s[%s]%s\033[0m\t%s\n", color_modifier, log->timestamp,level, log->message);
 }
 
 void log_port(char *msg, in_port_t port_num ){
     char* current_time = get_time();
-    fprintf(stdout, "[%s][ INFO ]\t%s %d\n", current_time, msg, port_num);
+    fprintf(stdout, "\033[0;36m[%s][ INFO ]\033[0m\t%s %d\n", current_time, msg, port_num);
 }
 
 /* 

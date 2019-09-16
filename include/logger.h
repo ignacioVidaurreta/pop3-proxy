@@ -2,6 +2,7 @@
 #define LOGGER_H
 
 #include <time.h>
+#include <arpa/inet.h>
 
 
 enum level {INFO, DEBUG, WARNING, ERROR, METRICS};
