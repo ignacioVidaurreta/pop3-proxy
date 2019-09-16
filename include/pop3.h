@@ -26,6 +26,9 @@
         int found_CR;
         int found_LF;
         int found_dot;
+        int* main_to_external_fds;
+        int* external_to_main_fds;
+        int external_process;
     };
 
 #endif

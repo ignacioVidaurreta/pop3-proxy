@@ -21,6 +21,7 @@
 #include "include/logger.h"
 #include "include/buffer.h"
 #include "include/metrics.h"
+#include "include/transformations.h"
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 #define LOCALHOST "127.0.0.1"
@@ -47,6 +48,8 @@ struct state_manager* init_state_manager() {
     state->found_CR = FALSE;
     state->found_LF = FALSE;
     state->found_dot = FALSE;
+    state->external_to_main_fds = NULL;
+    state->main_to_external_fds = NULL;
     return state;
 }
 
@@ -98,7 +101,7 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
                 memset(buffer,0,BUFFER_MAX_SIZE);
                 read_from_server(server_fd, buffer);
                 parse_response(buffer,state);
-                write_response(fd, buffer, state);//TODO: Rename fd 3 client_fd
+                write_response(fd, buffer, state); // TODO: Rename fd 3 client_fd
                 break;
             case REQUEST:
                 read_command(fd, buffer); 
@@ -113,7 +116,7 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
                     if(state->state == REQUEST){
                         write_response_from_buffer(fd, expandable_buffer);
                         expandable_buffer = init_buffer();
-                        //free_buffer(expandable_buffer);
+                        // free_buffer(expandable_buffer);
                     }else{
                         expand_buffer(expandable_buffer);
                     }
@@ -123,6 +126,7 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
                     parse_response(buffer, state);
                     transform_response(buffer, state);
                     write_response(fd, buffer, state);
+                    update_external_process_data(state);
                 }
                 break;
             default: 

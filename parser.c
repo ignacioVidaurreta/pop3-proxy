@@ -27,7 +27,7 @@ void read_multiline_command(char buffer[], int start, int end, struct state_mana
 
     if(buffer[0] == '-'){
         state->state = REQUEST;
-        return; //Do not parse, it's actually single line
+        return; // Do not parse, it's actually single line
     }
 
     for(int i = start; i < end && !ended; i++){
@@ -82,9 +82,9 @@ void parse_response(char* buffer, struct state_manager* state) {
 }
 
 void transform_response(char* buffer, struct state_manager* state) {
-    int* fds = create_process();
-    write_buffer(buffer, fds[1]);
-    read_transformation(buffer, fds[0]);
+    create_process(state);
+    write_buffer(buffer, state->main_to_external_fds[1]);
+    read_transformation(buffer, state->external_to_main_fds[0]);
 }
 
 void parse_command(char* buffer, struct state_manager* state) {

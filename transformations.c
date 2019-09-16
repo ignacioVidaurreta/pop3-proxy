@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <signal.h>
 
 #include "include/transformations.h"
 #include "include/config.h"
@@ -11,56 +14,50 @@
 
 extern struct config* options;
 
-int* stdin_stdout_pipes();
-
-int* create_process() {
-    int* pipe_fds = stdin_stdout_pipes();
-    if(dup2(pipe_fds[0], STDOUT_FILENO) == -1 || dup2(pipe_fds[1], STDIN_FILENO) == -1) {
+void create_process(struct state_manager* state) {
+    if(state->external_process)
+        return;
+    state->main_to_external_fds = malloc(2*sizeof(int));
+    state->external_to_main_fds = malloc(2*sizeof(int));
+    if(pipe(state->main_to_external_fds) == -1 || pipe(state->external_to_main_fds) == -1) {
         printf("%s failed to create pipes. %s", TRANSFORMATION_START_ERR_MSG, EXIT_MSG);
         exit(1);
     }
-    int pid = fork();
-    if(pid == -1) {
+    state->external_process = fork();
+    if(state->external_process == -1) {
         printf("%s failed to start external process. %s", TRANSFORMATION_START_ERR_MSG, EXIT_MSG);
         exit(1);
     }
-    else if(pid == 0) {
+    else if(state->external_process == 0) {
         logger(INFO, "Running transformation on email", get_time());
+        if(dup2(state->main_to_external_fds[0], STDIN_FILENO) == -1 || dup2(state->external_to_main_fds[1], STDOUT_FILENO) == -1) {
+            printf("%s failed to create pipes. %s", TRANSFORMATION_START_ERR_MSG, EXIT_MSG);
+            exit(1);
+        }
         execl("/bin/sh", "sh", "-c", options->cmd, NULL);
     }
-    else
-        waitpid(pid, NULL, 0);
-    return pipe_fds;
-}
-
-int* stdin_stdout_pipes() {
-    int* final_pipe = malloc(2*sizeof(int));
-    int* pipe_placeholder = malloc(2*sizeof(int));
-    if(pipe(pipe_placeholder) == - 1) {
-        printf("%s failed to create pipes. %s", TRANSFORMATION_START_ERR_MSG, EXIT_MSG);
-        exit(1);
-    };
-    final_pipe[0] = pipe_placeholder[0];
-    close(pipe_placeholder[1]);
-    if(pipe(pipe_placeholder) == -1) {
-        printf("%s failed to create pipes. %s", TRANSFORMATION_START_ERR_MSG, EXIT_MSG);
-        exit(1);
-    }
-    final_pipe[1] = pipe_placeholder[1];
-    close(pipe_placeholder[0]);
-    return final_pipe;
 }
 
 void write_buffer(char* buffer, int write_fd){
-    if(send(write_fd, buffer, strlen(buffer), 0) < 0){
+    if(dprintf(write_fd, buffer) < 0)
         print_error("Error writing to fd", get_time());
-    }
-    close(write_fd);
 }
 
-void read_transformation(char* buffer, int read_fd){
-    if(recv(read_fd, buffer, BUFFER_MAX_SIZE, 0) < 0){
+void read_transformation(char* buffer, int read_fd) {
+    if(read(read_fd, buffer, strlen(buffer)) < 0)
         print_error("Error reading from fd", get_time());
-    }
-    close(read_fd);
 }
+
+void update_external_process_data(struct state_manager* state) {
+    if(state->state == FILTER)
+        return;
+    kill(state->external_process, SIGKILL);
+    close(state->external_to_main_fds[0]);
+    close(state->external_to_main_fds[1]);
+    close(state->main_to_external_fds[0]);
+    close(state->main_to_external_fds[1]);
+    free(state->external_to_main_fds);
+    free(state->main_to_external_fds);
+    state->external_process = 0;
+}
+

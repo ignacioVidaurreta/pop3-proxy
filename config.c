@@ -79,7 +79,7 @@ int get_port_number(char* port){
 
 void change_port(in_port_t *port, char *port_str){
     long port_num = get_port_number(port_str);
-    if (*port == -1 ) exit(1); //TODO(Nachito): Configure chain of returns
+    if (*port == -1 ) exit(1); // TODO(Nachito): Configure chain of returns
     *port = port_num;
 }
 
