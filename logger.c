@@ -45,7 +45,7 @@ void write_log(struct log_message* log){
         perror("Error writing log");
         return;
     }
-    fprintf(stdout, "[%s] %s\t%s\n", log->timestamp,level, log->message);
+    fprintf(stdout, "[%s] %s\t%s\n", log->timestamp, level, log->message);
 }
 
 void log_port(char *msg, in_port_t port_num ){
