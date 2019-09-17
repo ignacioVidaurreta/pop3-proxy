@@ -22,7 +22,6 @@ clean:
 test: all
 	@echo "$(GREEN)Running tests!$(NORMAL)"
 	@tar -zcvf test_zip.tar *.c include/*
-	mv test_zip.tar tests/
 	$(MAKE) -C tests/
 	@echo "$(GREEN)Done!$(NORMAL)"
 
