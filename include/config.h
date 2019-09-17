@@ -3,6 +3,9 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+
+#define CAT_SIZE 4
+
 /**
 *  Structure that contains the program configuration 
 */
@@ -24,7 +27,9 @@ struct config {
     */
     char *replacement_message;
 
-    /*  Command used for external transformations
+    /** 
+     * Command used for external transformations
+     * if the -t argument isn't passed it defaults to cat.
     */
     char* cmd;
     // Current version of the program

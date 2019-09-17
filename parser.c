@@ -5,6 +5,7 @@
 #include <strings.h>
 #include "include/pop3.h"
 #include "include/parser.h"
+#include "include/transformations.h"
 
 /**
  *  Reads command from the filedescriptor and saves it to the command buffer
@@ -26,7 +27,7 @@ void read_multiline_command(char buffer[], int start, int end, struct state_mana
 
     if(buffer[0] == '-'){
         state->state = REQUEST;
-        return; //Do not parse, it's actually single line
+        return; // Do not parse, it's actually single line
     }
 
     for(int i = start; i < end && !ended; i++){
@@ -79,13 +80,26 @@ void parse_response(char* buffer, struct state_manager* state) {
     }
 
 }
+
+void transform_response(char* buffer, struct state_manager* state) {
+    create_process(state);
+    write_buffer(buffer, state->main_to_external_fds[1]);
+    read_transformation(buffer, state->external_to_main_fds[0]);
+}
+
 void parse_command(char* buffer, struct state_manager* state) {
     char cmd[8], extra[64];
     sscanf(buffer,"%s %s", cmd, extra);
 
-    if (strcasecmp(cmd, "RETR") == 0 || strcasecmp(cmd, "LIST") == 0 || strcasecmp(cmd, "CAPA") == 0 || strcasecmp(cmd, "UIDL") == 0 || strcasecmp(cmd, "TOP") == 0) {
-        state->is_single_line = FALSE;
+    if (strcasecmp(cmd, "RETR") == 0 ||
+        strcasecmp(cmd, "LIST") == 0 ||
+        strcasecmp(cmd, "CAPA") == 0 ||
+        strcasecmp(cmd, "UIDL") == 0 ||
+        strcasecmp(cmd, "TOP") == 0) {
+            state->is_single_line = FALSE;
     }
     else
         state->is_single_line = TRUE;
+    if(strcasecmp(cmd, "RETR") == 0)
+        state->state = FILTER;
 }

@@ -12,17 +12,23 @@
     #define TRUE 1
     #define FALSE 0
 
-    #define RESPONSE 2
-    #define REQUEST 3
-    #define END 4
+    enum POP3_STATE {
+        RESPONSE = 0,
+        REQUEST = 1,
+        FILTER = 2,
+        END = 3,
+    };
 
 
     struct state_manager {
-    int state;
-    int is_single_line;
-    int found_CR;
-    int found_LF;
-    int found_dot;
+        enum POP3_STATE state;
+        int is_single_line;
+        int found_CR;
+        int found_LF;
+        int found_dot;
+        int* main_to_external_fds;
+        int* external_to_main_fds;
+        int external_process;
     };
 
 #endif

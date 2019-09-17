@@ -13,7 +13,7 @@
 
 void write_response(int fd, char *response, struct state_manager* state){
     int n;
-    if((n = send(fd, response, strlen(response), 0))<0){
+    if((n = send(fd, response, strlen(response), 0)) < 0){
         perror("Error sending data to client\n");
         return;
     }

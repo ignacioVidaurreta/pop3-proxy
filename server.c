@@ -31,5 +31,6 @@ void write_to_server(int server_fd, char *cmd, struct state_manager* state){
         perror("Error sending data to server\n");
     }
     update_metrics_transfered_bytes(n);
-    state->state = RESPONSE;
+    if(state->state != FILTER)
+        state->state = RESPONSE;
 }
