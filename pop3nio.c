@@ -97,6 +97,45 @@ enum pop3_state {
     ERROR,
 };
 
+/** definición de handlers para cada estado */
+static const struct state_definition client_statbl[] = {
+    {
+        .state            = CONNECTING,
+        .on_arrival       = connection_init,
+    }, {
+        .state            = EHLO,
+        .on_arrival       = ehlo_ready,
+        .on_read_ready    = capa_read,
+    },{
+        .state            = CAPA,
+        .on_arrival       = capa_init,
+        .on_read_ready    = capa_read,
+    },{
+        .state            = REQUEST,
+        .on_read_ready    = request_read,
+        .on_depature      = request_sent,
+    },{
+        .state            = RESPONSE_RECV,
+        .on_read_ready    = response_read,
+    },{
+        .state            = RESPOND_SEND,
+        .on_write_ready   = response_send,
+    }, {
+        .state            = FILTER,
+        .on_arrival       = filter_init,
+        .on_write_ready   = filter_send,
+        .on_read_ready    = filter_recv,
+    }, {
+        .state            = DONE,
+    },{
+        .state            = ERROR,
+    }
+};
+static const struct state_definition *
+socks5_describe_states(void) {
+    return client_statbl;
+}
+
 void pop3filter_passive_accept{
     //https://stackoverflow.com/questions/16010622/reasoning-behind-c-sockets-sockaddr-and-sockaddr-storage
     struct sockaddr_storage       client_addr;
