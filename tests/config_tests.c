@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "CuTest.h"
-#include "tmp/include/config.h"
+#include "../include/config.h"
 
 
 void test_replace_string(CuTest *tc){
