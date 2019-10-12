@@ -15,9 +15,9 @@
 #include "request.h"
 #include "buffer.h"
 
-#include "stm.h"
+#include "include/stm.h"
 #include "pop3nio.h"
-#include"netutils.h"
+#include "netutils.h"
 #include "include/pop3nio.h"
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 
@@ -209,6 +209,22 @@ finally:
     return ret;
 }
 
+/** obtiene el struct (socks5 *) desde la llave de selección  */
+#define ATTACHMENT(key) ( (struct socks5 *)(key)->data)
+
+/* declaración forward de los handlers de selección de una conexión
+ * establecida entre un cliente y el proxy.
+ */
+static void pop3_read   (struct selector_key *key);
+static void pop3_write  (struct selector_key *key);
+static void pop3_block  (struct selector_key *key);
+static void pop3_close  (struct selector_key *key);
+static const struct fd_handler pop3_handler = {
+    .handle_read   = pop3_read,
+    .handle_write  = pop3_write,
+    .handle_close  = pop3_close,
+    .handle_block  = pop3_block,
+};
 void pop3filter_passive_accept{
     //https://stackoverflow.com/questions/16010622/reasoning-behind-c-sockets-sockaddr-and-sockaddr-storage
     struct sockaddr_storage       client_addr;
@@ -234,7 +250,7 @@ void pop3filter_passive_accept{
     state->client_addr_len = client_addr_len;
 
     //TODO create pop3_handler
-    if(SELECTOR_SUCCESS != selector_register(key->s, client, &socks5_handler,
+    if(SELECTOR_SUCCESS != selector_register(key->s, client, &pop3_handler,
                                             OP_READ, state)) {
         goto fail;
     }
@@ -284,4 +300,60 @@ static const struct state_definition client_statbl[] = {
 static const struct state_definition *
 pop3_describe_states(void) {
     return client_statbl;
+}
+///////////////////////////////////////////////////////////////////////////////
+// Handlers top level de la conexión pasiva.
+// son los que emiten los eventos a la maquina de estados.
+static void
+pop3_done(struct selector_key* key);
+
+static void
+pop3_read(struct selector_key *key) {
+    struct state_machine *stm   = &ATTACHMENT(key)->stm;
+    const enum socks_v5state st = stm_handler_read(stm, key);
+
+    if(ERROR == st || DONE == st) {
+        socksv5_done(key);
+    }
+}
+
+static void
+pop3_write(struct selector_key *key) {
+    struct state_machine *stm   = &ATTACHMENT(key)->stm;
+    const enum socks_v5state st = stm_handler_write(stm, key);
+
+    if(ERROR == st || DONE == st) {
+        socksv5_done(key);
+    }
+}
+
+static void
+pop3_block(struct selector_key *key) {
+    struct state_machine *stm   = &ATTACHMENT(key)->stm;
+    const enum socks_v5state st = stm_handler_block(stm, key);
+
+    if(ERROR == st || DONE == st) {
+        socksv5_done(key);
+    }
+}
+
+static void
+pop3_close(struct selector_key *key) {
+    socks5_destroy(ATTACHMENT(key));
+}
+
+static void
+pop3_done(struct selector_key* key) {
+    const int fds[] = {
+        ATTACHMENT(key)->client_fd,
+        ATTACHMENT(key)->origin_fd,
+    };
+    for(unsigned i = 0; i < N(fds); i++) {
+        if(fds[i] != -1) {
+            if(SELECTOR_SUCCESS != selector_unregister_fd(key->s, fds[i])) {
+                abort();
+            }
+            close(fds[i]);
+        }
+    }
 }
