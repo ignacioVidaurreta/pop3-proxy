@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -pthread -std=c99 -pedantic -Wall
+CFLAGS = -pthread -std=c99 -pedantic -Wall -fsanitize=address
 FILES = main.c pop3.c parser.c server.c client.c config.c logger.c metrics.c buffer.c transformations.c
 GREEN = \e[92m
 NORMAL = \e[0m
