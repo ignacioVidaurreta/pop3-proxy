@@ -131,10 +131,72 @@ static const struct state_definition client_statbl[] = {
         .state            = ERROR,
     }
 };
+
 static const struct state_definition *
 socks5_describe_states(void) {
     return client_statbl;
 }
+
+/*
+ * Si bien cada estado tiene su propio struct que le da un alcance
+ * acotado, disponemos de la siguiente estructura para hacer una única
+ * alocación cuando recibimos la conexión.
+ *
+ * Se utiliza un contador de referencias (references) para saber cuando debemos
+ * liberarlo finalmente, y un pool para reusar alocaciones previas.
+ */
+struct pop3 {
+    /** información del cliente */
+    struct sockaddr_storage       client_addr;
+    socklen_t                     client_addr_len;
+    int                           client_fd;
+
+    char*                         client_username;
+
+    /** resolución de la dirección del origin server */
+    struct addrinfo              *origin_resolution;
+    /** intento actual de la dirección del origin server */
+    struct addrinfo              *origin_resolution_current;
+
+    /** información del origin server */
+    struct sockaddr_storage       origin_addr;
+    socklen_t                     origin_addr_len;
+    int                           origin_domain;
+    int                           origin_fd;
+
+    /** maquinas de estados */
+    struct state_machine          stm;
+
+    /** estados para el client_fd */
+    union {
+        struct request_st         request;
+        struct response_send_st   response_send;
+        struct error_st           error;
+    } client;
+    
+    /** estados para el origin_fd */
+    union {
+        struct ehlo_st            ehlo;
+        struct capa_st            capa;
+        struct request_st         conn;
+        struct response_recv      response_recv;
+    } orig;
+
+    /** estados para el filter_fd */
+    union {
+        struct filter_st          filter;
+    } filter;
+
+    /** buffers para ser usados read_buffer, write_buffer.*/
+    uint8_t raw_buff_a[2048], raw_buff_b[2048]; //Si neecsitamos mas buffers, los podemos agregar aca.
+    buffer read_buffer, write_buffer;
+    
+    /** cantidad de referencias a este objeto. si es uno se debe destruir */
+    unsigned references;
+
+    /** siguiente en el pool */
+    struct pop3 *next;
+};
 
 void pop3filter_passive_accept{
     //https://stackoverflow.com/questions/16010622/reasoning-behind-c-sockets-sockaddr-and-sockaddr-storage
