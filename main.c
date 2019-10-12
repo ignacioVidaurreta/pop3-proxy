@@ -16,7 +16,7 @@
 #include "include/config.h"
 #include "include/logger.h"
 #include "include/metrics.h"
-
+#include "include/pop3nio.h"
 #include "include/selector.h"
 
 static bool done = false;
@@ -76,7 +76,6 @@ main(const int argc, const char **argv) {
     }
 
     log_port("Listening on TCP port", options->local_port);
-    fprintf(stdout, "Listening on TCP port %d\n", options->local_port);
 
     // registrar sigterm es útil para terminar el programa normalmente.
     // esto ayuda mucho en herramientas como valgrind.

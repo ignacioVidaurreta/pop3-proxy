@@ -12,14 +12,13 @@
 
 #include <arpa/inet.h>
 
-#include "hello.h"
 #include "request.h"
 #include "buffer.h"
 
 #include "stm.h"
 #include "pop3nio.h"
 #include"netutils.h"
-
+#include "include/pop3nio.h"
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 
 /** maquina de estados general */
@@ -93,20 +92,45 @@ enum pop3_state {
      */
     FILTER,
 
-    /**
-     * Copia bytes entre client_fd y origin_fd.
-     *
-     * Intereses: (tanto para client_fd y origin_fd)
-     *   - OP_READ  si hay espacio para escribir en el buffer de lectura
-     *   - OP_WRITE si hay bytes para leer en el buffer de escritura
-     *
-     * Transicion:
-     *   - DONE     cuando no queda nada mas por copiar.
-     */
-    COPY,
-
     // estados terminales
     DONE,
     ERROR,
 };
+
+void pop3filter_passive_accept{
+    //https://stackoverflow.com/questions/16010622/reasoning-behind-c-sockets-sockaddr-and-sockaddr-storage
+    struct sockaddr_storage       client_addr;
+    socklen_t                     client_addr_len = sizeof(client_addr);
+    struct pop3             *state           = NULL; //TODO structure
+
+    const int client = accept(key->fd, (struct sockaddr*) &client_addr,
+                                                        &client_addr_len);
+    if(client == -1) {
+        goto fail;
+    }
+    if(selector_fd_set_nio(client) == -1) {
+        goto fail;
+    }
+    state = socks5_new(client); //Todo initialization of structure
+    if(state == NULL) {
+        // sin un estado, nos es imposible manejaro.
+        // tal vez deberiamos apagar accept() hasta que detectemos
+        // que se liberó alguna conexión.
+        goto fail;
+    }
+    memcpy(&state->client_addr, &client_addr, client_addr_len);
+    state->client_addr_len = client_addr_len;
+
+    //TODO create pop3_handler
+    if(SELECTOR_SUCCESS != selector_register(key->s, client, &socks5_handler,
+                                            OP_READ, state)) {
+        goto fail;
+    }
+    return ;
+fail:
+    if(client != -1) {
+        close(client);
+    }
+    socks5_destroy(state);
+}
 
