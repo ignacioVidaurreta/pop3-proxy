@@ -1,22 +1,23 @@
 CC = gcc
 CFLAGS = -pthread -std=c99 -pedantic -Wall -fsanitize=address
-FILES = main.c pop3.c parser.c server.c client.c config.c logger.c metrics.c buffer.c transformations.c
 GREEN = \e[92m
 NORMAL = \e[0m
+FILES=./*.c
+EXEC_NAME = run
 all: 
 	@echo "$(GREEN)Compiling ...$(NORMAL)"
-	$(CC) $(CFLAGS) $(FILES) -o run
+	$(CC) $(CFLAGS) $(FILES) -o $(EXEC_NAME)
 	@echo "$(GREEN)Done!$(NORMAL)"
 
 debug:
 	@echo "$(GREEN)Compiling in debug mode ...$(NORMAL)"
-	$(CC) -g $(CFLAGS) $(FILES) -o run_debug
+	$(CC) -g $(CFLAGS) $(FILES) -o $(EXEC_NAME)_debug
 	@echo "$(GREEN)Done!$(NORMAL)"
 
 
 clean:
 	@echo "$(GREEN)Cleaning up ...$(NORMAL)"
-	rm -f run run_debug tests/a.out
+	rm -f $(EXEC_NAME) $(EXEC_NAME)_debug tests/a.out
 	@echo "$(GREEN)Done!$(NORMAL)"
 
 test: all
@@ -28,8 +29,8 @@ test: all
 	@echo "$(GREEN)Done!$(NORMAL)"
 
 run: all
-	@./run
+	@./$(EXEC_NAME)
 
 gdb: debug
-	gdb run_debug
+	gdb $(EXEC_NAME)_debug
 

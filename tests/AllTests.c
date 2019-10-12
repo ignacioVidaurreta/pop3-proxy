@@ -4,6 +4,7 @@
 CuSuite* ConfigUtilGetSuite();
 CuSuite* ParserUtilGetSuite();
 
+
 void RunAllTests(void){
     CuString *output = CuStringNew();
     CuSuite* suite = CuSuiteNew();
