@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "include/linked_list.h"
 
 enum CMD {
     AUTH =0,
@@ -9,5 +10,5 @@ enum CMD {
 struct request {
     CMD command;
     int arg_len;
-    //linked list --> args
+    list_head* args;
 };
