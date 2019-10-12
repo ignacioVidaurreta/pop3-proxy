@@ -97,46 +97,6 @@ enum pop3_state {
     ERROR,
 };
 
-/** definición de handlers para cada estado */
-static const struct state_definition client_statbl[] = {
-    {
-        .state            = CONNECTING,
-        .on_arrival       = connection_init,
-    }, {
-        .state            = EHLO,
-        .on_arrival       = ehlo_ready,
-        .on_read_ready    = capa_read,
-    },{
-        .state            = CAPA,
-        .on_arrival       = capa_init,
-        .on_read_ready    = capa_read,
-    },{
-        .state            = REQUEST,
-        .on_read_ready    = request_read,
-        .on_depature      = request_sent,
-    },{
-        .state            = RESPONSE_RECV,
-        .on_read_ready    = response_read,
-    },{
-        .state            = RESPOND_SEND,
-        .on_write_ready   = response_send,
-    }, {
-        .state            = FILTER,
-        .on_arrival       = filter_init,
-        .on_write_ready   = filter_send,
-        .on_read_ready    = filter_recv,
-    }, {
-        .state            = DONE,
-    },{
-        .state            = ERROR,
-    }
-};
-
-static const struct state_definition *
-socks5_describe_states(void) {
-    return client_statbl;
-}
-
 /*
  * Si bien cada estado tiene su propio struct que le da un alcance
  * acotado, disponemos de la siguiente estructura para hacer una única
@@ -173,7 +133,7 @@ struct pop3 {
         struct response_send_st   response_send;
         struct error_st           error;
     } client;
-    
+
     /** estados para el origin_fd */
     union {
         struct ehlo_st            ehlo;
@@ -198,6 +158,57 @@ struct pop3 {
     struct pop3 *next;
 };
 
+/**
+ * Pool de `struct pop3', para ser reusados.
+ *
+ * Como tenemos un unico hilo que emite eventos no necesitamos barreras de
+ * contención.
+ */
+
+static const unsigned  max_pool  = 50; // tamaño máximo
+static unsigned        pool_size = 0;  // tamaño actual
+static struct socks5 * pool      = 0;  // pool propiamente dicho
+
+static const struct state_definition *
+pop3_describe_states(void);
+
+/** crea un nuevo `struct pop3' */
+static struct pop3 *
+pop3_new(int client_fd) {
+    struct pop3 *ret;
+
+    if(pool == NULL) {
+        ret = malloc(sizeof(*ret));
+    } else {
+        ret       = pool;
+        pool      = pool->next;
+        ret->next = 0;
+    }
+    if(ret == NULL) {
+        goto finally;
+    }
+    memset(ret, 0x00, sizeof(*ret));
+
+    ret->origin_fd       = -1;
+    ret->client_fd       = client_fd;
+    ret->client_addr_len = sizeof(ret->client_addr);
+
+    ret->stm    .initial   = CONNECTING;
+    ret->stm    .max_state = ERROR;
+    ret->stm    .states    = pop3_describe_states();
+    stm_init(&ret->stm);
+
+    buffer_init(&ret->read_buffer,  N(ret->raw_buff_a), ret->raw_buff_a);
+    buffer_init(&ret->write_buffer, N(ret->raw_buff_b), ret->raw_buff_b);
+
+    //TODO: INCREMENTAR CANTIDAD DE CONEXIONES CONCURRENTES, 
+    //TODAVIA NO TENEMOS LA STRUCT GLOBAL METRICS REFERENCIADA EN ESTE ARCHIVO
+
+    ret->references = 1;
+finally:
+    return ret;
+}
+
 void pop3filter_passive_accept{
     //https://stackoverflow.com/questions/16010622/reasoning-behind-c-sockets-sockaddr-and-sockaddr-storage
     struct sockaddr_storage       client_addr;
@@ -212,7 +223,7 @@ void pop3filter_passive_accept{
     if(selector_fd_set_nio(client) == -1) {
         goto fail;
     }
-    state = socks5_new(client); //Todo initialization of structure
+    state = pop3_new(client); //Todo initialization of structure
     if(state == NULL) {
         // sin un estado, nos es imposible manejaro.
         // tal vez deberiamos apagar accept() hasta que detectemos
@@ -235,3 +246,42 @@ fail:
     socks5_destroy(state);
 }
 
+/** definición de handlers para cada estado */
+static const struct state_definition client_statbl[] = {
+    {
+        .state            = CONNECTING,
+        .on_arrival       = connection_init,
+    }, {
+        .state            = EHLO,
+        .on_arrival       = ehlo_ready,
+        .on_read_ready    = capa_read,
+    },{
+        .state            = CAPA,
+        .on_arrival       = capa_init,
+        .on_read_ready    = capa_read,
+    },{
+        .state            = REQUEST,
+        .on_read_ready    = request_read,
+        .on_depature      = request_sent,
+    },{
+        .state            = RESPONSE_RECV,
+        .on_read_ready    = response_read,
+    },{
+        .state            = RESPOND_SEND,
+        .on_write_ready   = response_send,
+    }, {
+        .state            = FILTER,
+        .on_arrival       = filter_init,
+        .on_write_ready   = filter_send,
+        .on_read_ready    = filter_recv,
+    }, {
+        .state            = DONE,
+    },{
+        .state            = ERROR,
+    }
+};
+
+static const struct state_definition *
+pop3_describe_states(void) {
+    return client_statbl;
+}
