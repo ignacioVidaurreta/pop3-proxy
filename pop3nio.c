@@ -43,6 +43,17 @@ enum pop3_state {
     EHLO,
 
     /**
+     * Comprueba que el servidor origen tenga capacidad de pipelining
+     *
+     * Transiciones:
+     *   - REQUEST       mientras el mensaje no esté completo
+     *   - RESPONSE      si el mensajte esta completo y transmitido por completo
+     *   - ERROR         ante cualquier error (IO/parseo)
+     */
+    CAPA,
+
+
+    /**
      * Recibe un pedido del cliente y lo transmite al host
      *
      * Transiciones:
@@ -98,3 +109,4 @@ enum pop3_state {
     DONE,
     ERROR,
 };
+
