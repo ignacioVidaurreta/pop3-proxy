@@ -26,6 +26,15 @@
 
 /** maquina de estados general */
 enum pop3_state {
+  /**
+     * Resuelve la direccion del servidor de origen
+     *
+     * Transiciones:
+     *   - CONNECTING     mientras el mensaje no esté completo
+     *   - ERROR    ante cualquier error de conexion
+     */
+    RESOLVE,
+
    /**
      * Se conecta con el servidor de origen.
      *
@@ -291,8 +300,11 @@ static unsigned response_read(struct selector_key *key){
 /** definición de handlers para cada estado */
 static const struct state_definition client_statbl[] = {
     {
+        .state            = RESOLVE,
+        .on_arrival       = connection_resolve,
+    }, {
         .state            = CONNECTING,
-        .on_arrival       = connection_init,
+        .on_arrival       = connection_start,
     }, {
         .state            = EHLO,
         .on_arrival       = ehlo_ready,
@@ -383,4 +395,27 @@ pop3_done(struct selector_key* key) {
             close(fds[i]);
         }
     }
+}
+
+// Resolucion de nombre del origin server
+static unsigned
+connection_resolve(struct selector_key *key) {
+    unsigned ret;
+    pthread_t tid;
+
+    struct selector_key* k = malloc(sizeof(*key));
+    if(k == NULL) {
+        ret = ERROR;
+    }
+    else {
+        memcpy(k, key, sizeof(*k));
+        if(pthread_create(&tid, 0, connect_resolv_blocking, k) == -1) {
+            ret = ERROR;
+        } 
+        else{
+            ret = CONNECTING;
+            selector_set_interest_key(key, OP_NOOP);
+        }
+    }
+    return ret;
 }
