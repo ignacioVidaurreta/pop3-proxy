@@ -12,14 +12,9 @@
 
 #include <arpa/inet.h>
 
-#include "hello.h"
-#include "request.h"
-#include "buffer.h"
-
-#include "stm.h"
-#include "pop3nio.h"
-#include"netutils.h"
-
+#include "include/buffer.h"
+#include "include/stm.h"
+#include "include/pop3nio.h"
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 
 /** maquina de estados general */
@@ -168,6 +163,17 @@ struct pop3 {
     struct pop3 *next;
 };
 
+struct response_send_st {
+    buffer                  *wb, *rb;
+    int                     *fd;
+};
+
+struct request_st {
+    buffer                  *buffer;
+    int                     *fd;
+};
+
+
 /**
  * Pool de `struct pop3', para ser reusados.
  *
@@ -235,7 +241,7 @@ static const struct fd_handler pop3_handler = {
     .handle_close  = pop3_close,
     .handle_block  = pop3_block,
 };
-void pop3filter_passive_accept{
+void pop3filter_passive_accept(){
     //https://stackoverflow.com/questions/16010622/reasoning-behind-c-sockets-sockaddr-and-sockaddr-storage
     struct sockaddr_storage       client_addr;
     socklen_t                     client_addr_len = sizeof(client_addr);
