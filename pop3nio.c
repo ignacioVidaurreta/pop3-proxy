@@ -12,15 +12,6 @@
 
 #include <arpa/inet.h>
 
-<<<<<<< HEAD
-#include "request.h"
-#include "buffer.h"
-
-#include "include/stm.h"
-#include "pop3nio.h"
-#include "netutils.h"
-#include "include/pop3nio.h"
-=======
 #include "hello.h"
 #include "request.h"
 #include "buffer.h"
@@ -29,11 +20,19 @@
 #include "pop3nio.h"
 #include"netutils.h"
 
->>>>>>> 13536b5a256bc3cefd9079973b37534971609fe6
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 
 /** maquina de estados general */
 enum pop3_state {
+  /**
+     * Resuelve la direccion del servidor de origen
+     *
+     * Transiciones:
+     *   - CONNECTING     mientras el mensaje no esté completo
+     *   - ERROR    ante cualquier error de conexion
+     */
+    RESOLVE,
+
    /**
      * Se conecta con el servidor de origen.
      *
@@ -51,7 +50,6 @@ enum pop3_state {
      *   - ERROR    ante cualquier error (IO/parseo)
      */
     EHLO,
-<<<<<<< HEAD
 
     /**
      * Comprueba que el servidor origen tenga capacidad de pipelining
@@ -64,9 +62,6 @@ enum pop3_state {
     CAPA,
 
 
-=======
-    
->>>>>>> 13536b5a256bc3cefd9079973b37534971609fe6
     /**
      * Recibe un pedido del cliente y lo transmite al host
      *
@@ -107,7 +102,6 @@ enum pop3_state {
      */
     FILTER,
 
-<<<<<<< HEAD
     // estados terminales
     DONE,
     ERROR,
@@ -281,8 +275,11 @@ fail:
 /** definición de handlers para cada estado */
 static const struct state_definition client_statbl[] = {
     {
+        .state            = RESOLVE,
+        .on_arrival       = connection_resolve,
+    }, {
         .state            = CONNECTING,
-        .on_arrival       = connection_init,
+        .on_arrival       = connection_start,
     }, {
         .state            = EHLO,
         .on_arrival       = ehlo_ready,
@@ -373,21 +370,26 @@ pop3_done(struct selector_key* key) {
         }
     }
 }
-=======
-    /**
-     * Copia bytes entre client_fd y origin_fd.
-     *
-     * Intereses: (tanto para client_fd y origin_fd)
-     *   - OP_READ  si hay espacio para escribir en el buffer de lectura
-     *   - OP_WRITE si hay bytes para leer en el buffer de escritura
-     *
-     * Transicion:
-     *   - DONE     cuando no queda nada mas por copiar.
-     */
-    COPY,
 
-    // estados terminales
-    DONE,
-    ERROR,
-};
->>>>>>> 13536b5a256bc3cefd9079973b37534971609fe6
+// Resolucion de nombre del origin server
+static unsigned
+connection_resolve(struct selector_key *key) {
+    unsigned ret;
+    pthread_t tid;
+
+    struct selector_key* k = malloc(sizeof(*key));
+    if(k == NULL) {
+        ret = ERROR;
+    }
+    else {
+        memcpy(k, key, sizeof(*k));
+        if(pthread_create(&tid, 0, connect_resolv_blocking, k) == -1) {
+            ret = ERROR;
+        } 
+        else{
+            ret = CONNECTING;
+            selector_set_interest_key(key, OP_NOOP);
+        }
+    }
+    return ret;
+}
