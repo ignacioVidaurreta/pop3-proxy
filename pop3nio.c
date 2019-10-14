@@ -116,6 +116,8 @@ struct pop3 {
     socklen_t                     client_addr_len;
     int                           client_fd;
 
+    char*                         error;
+
     char*                         client_username;
 
     /** resolución de la dirección del origin server */
@@ -283,6 +285,7 @@ static const struct state_definition client_statbl[] = {
     {
         .state            = RESOLVE,
         .on_arrival       = connection_resolve,
+        .on_block_ready   = connection_resolve_complete,
     }, {
         .state            = CONNECTING,
         .on_arrival       = connection_start,
@@ -377,6 +380,14 @@ pop3_done(struct selector_key* key) {
     }
 }
 
+
+/////////////////////////////////////////////////////////
+///////////       Funciones de estados        ///////////
+/////////////////////////////////////////////////////////
+
+
+///////      RESOLVE      ///////
+
 // Resolucion de nombre del origin server
 static unsigned
 connection_resolve(struct selector_key *key) {
@@ -389,13 +400,138 @@ connection_resolve(struct selector_key *key) {
     }
     else {
         memcpy(k, key, sizeof(*k));
-        if(pthread_create(&tid, 0, connect_resolv_blocking, k) == -1) {
+        if(pthread_create(&tid, 0, connection_resolve_blocking, k) == -1) {
             ret = ERROR;
         } 
         else{
-            ret = CONNECTING;
+            ret = RESOLVE;
             selector_set_interest_key(key, OP_NOOP);
         }
     }
     return ret;
+}
+
+/**
+ * Realiza la resolución de DNS bloqueante.
+ *
+ * Una vez resuelto notifica al selector para que el evento esté
+ * disponible en la próxima iteración.
+ */
+static void *
+connection_resolve_blocking(void *data) {
+    struct selector_key *key = (struct selector_key *) data;
+    struct pop3         *p   = ATTACHMENT(key);
+
+    pthread_detach(pthread_self());
+    p->origin_resolution = 0;
+    struct addrinfo hints = {
+            .ai_family    = AF_UNSPEC,
+            .ai_socktype  = SOCK_STREAM,
+            .ai_flags     = AI_PASSIVE,
+            .ai_protocol  = IPPROTO_TCP,
+            .ai_canonname = NULL,
+            .ai_addr      = NULL,
+            .ai_next      = NULL,
+    };
+
+    char buff[7];
+    snprintf(buff, sizeof(buff), "%hu",proxy->origin_port);
+
+    getaddrinfo(proxy->origin_address, buff, &hints,&p->origin_resolution);
+
+    selector_notify_block(key->s, key->fd);
+
+    free(data);
+    return 0;
+}
+
+/** procesa el resultado de la resolución de nombres */
+static unsigned
+connection_resolve_complete(struct selector_key *key) {
+    struct pop3       *p =  ATTACHMENT(key);
+    unsigned           ret;
+
+    if(p->origin_resolution == 0) {
+        p->erorr = "Couldn't resolve origin name server.";
+        goto error;
+    } else {
+        p->origin_domain   = p->origin_resolution->ai_family;
+        p->origin_addr_len = p->origin_resolution->ai_addrlen;
+        memcpy(&p->origin_addr,
+               p->origin_resolution->ai_addr,
+               (size_t) p->origin_resolution->ai_addrlen);
+        p->origin_resolution_current = p->origin_resolution;
+    }
+
+    //OPEN SOCKET CONNECTION
+    int sock = socket(p->origin_domain, SOCK_STREAM, IPPROTO_TCP);
+
+    if (sock < 0 || selector_fd_set_nio(sock) == -1) {
+        p->error = "Error creating socket for connectino with origin server";
+        goto error;
+    }
+
+    if (connect(sock, (const struct sockaddr *)&p->origin_addr, p->origin_addr_len) == -1) {
+        if(errno == EINPROGRESS) {
+            // dejamos de de pollear el socket del cliente
+            selector_status st = selector_set_interest_key(key, OP_NOOP);
+            if(SELECTOR_SUCCESS != st) {
+                p->error = "Error connecting to origin server";
+                goto error;
+            }
+
+            // esperamos la conexion en el nuevo socket
+            st = selector_register(key->s, sock, &pop3_handler, OP_WRITE, key->data);
+            if(SELECTOR_SUCCESS != st) {
+                p->error = "Error connecting to origin server";
+                goto error;
+            }
+            p->references += 1;
+        } else {
+            selector_unregister_fd(key->s, sock);
+            p->error = "Error connecting to origin server";
+            goto error;
+        }
+    } else {
+        p->error = "Error connecting to origin server";
+        goto error;
+    }
+
+    return CONNECTING;
+error:
+    logger(ERROR, p->error, get_time());
+    return ERROR;
+}
+
+///////      CONNECTING      ///////
+
+static unsigned
+connecting(struct selector_key *key) {
+    struct pop3 *p = ATTACHMENT(key);
+    unsigned ret;
+    int error;
+    socklen_t len = sizeof(error);
+    
+    d->origin_fd = key->fd;
+
+    if (getsockopt(key->fd, SOL_SOCKET, SO_ERROR, &error, &len) < 0) {
+        p->error = "Connection refused (while connecting to origin server).";
+        selector_set_interest_key(key, OP_NOOP);
+        return ERROR;
+    } else {
+        if (error == 0) {
+            p->origin_fd = key->fd;
+        } else {
+            selector_unregister_fd(key->s, key->fd);
+            close(key->fd);
+            p->error = "Connection refused (while connecting to origin server).";
+            return ERROR;
+        }
+    }
+
+    selector_status s = SELECTOR_SUCCESS;
+    
+    s |= selector_set_interest_key(key, OP_READ);
+    s |= selector_set_interest(key->s, p->client_fd, OP_NOOP);
+    return SELECTOR_SUCCESS == s ? EHLO : ERROR;
 }
