@@ -12,24 +12,9 @@
 
 #include <arpa/inet.h>
 
-<<<<<<< HEAD
-#include "request.h"
-#include "buffer.h"
-
+#include "include/buffer.h"
 #include "include/stm.h"
-#include "pop3nio.h"
-#include "netutils.h"
 #include "include/pop3nio.h"
-=======
-#include "hello.h"
-#include "request.h"
-#include "buffer.h"
-
-#include "stm.h"
-#include "pop3nio.h"
-#include"netutils.h"
-
->>>>>>> 13536b5a256bc3cefd9079973b37534971609fe6
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 
 /** maquina de estados general */
@@ -51,7 +36,6 @@ enum pop3_state {
      *   - ERROR    ante cualquier error (IO/parseo)
      */
     EHLO,
-<<<<<<< HEAD
 
     /**
      * Comprueba que el servidor origen tenga capacidad de pipelining
@@ -64,9 +48,6 @@ enum pop3_state {
     CAPA,
 
 
-=======
-    
->>>>>>> 13536b5a256bc3cefd9079973b37534971609fe6
     /**
      * Recibe un pedido del cliente y lo transmite al host
      *
@@ -107,7 +88,6 @@ enum pop3_state {
      */
     FILTER,
 
-<<<<<<< HEAD
     // estados terminales
     DONE,
     ERROR,
@@ -173,6 +153,17 @@ struct pop3 {
     /** siguiente en el pool */
     struct pop3 *next;
 };
+
+struct response_send_st {
+    buffer                  *wb, *rb;
+    int                     *fd;
+};
+
+struct request_st {
+    buffer                  *buffer;
+    int                     *fd;
+};
+
 
 /**
  * Pool de `struct pop3', para ser reusados.
@@ -241,7 +232,7 @@ static const struct fd_handler pop3_handler = {
     .handle_close  = pop3_close,
     .handle_block  = pop3_block,
 };
-void pop3filter_passive_accept{
+void pop3filter_passive_accept(){
     //https://stackoverflow.com/questions/16010622/reasoning-behind-c-sockets-sockaddr-and-sockaddr-storage
     struct sockaddr_storage       client_addr;
     socklen_t                     client_addr_len = sizeof(client_addr);
@@ -373,21 +364,3 @@ pop3_done(struct selector_key* key) {
         }
     }
 }
-=======
-    /**
-     * Copia bytes entre client_fd y origin_fd.
-     *
-     * Intereses: (tanto para client_fd y origin_fd)
-     *   - OP_READ  si hay espacio para escribir en el buffer de lectura
-     *   - OP_WRITE si hay bytes para leer en el buffer de escritura
-     *
-     * Transicion:
-     *   - DONE     cuando no queda nada mas por copiar.
-     */
-    COPY,
-
-    // estados terminales
-    DONE,
-    ERROR,
-};
->>>>>>> 13536b5a256bc3cefd9079973b37534971609fe6
