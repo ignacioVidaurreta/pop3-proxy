@@ -161,7 +161,12 @@ struct pop3 {
     struct pop3 *next;
 };
 
-struct response_st {
+struct hello_st {
+    /** buffer utilizado para I/O */
+    buffer               *rb, *wb;
+} ;
+
+struct response_send_st {
     buffer                  *wb, *rb;
     int                     *fd;
 };
@@ -555,3 +560,110 @@ connecting(struct selector_key *key) {
     s |= selector_set_interest(key->s, p->client_fd, OP_NOOP);
     return SELECTOR_SUCCESS == s ? EHLO : ERROR;
 }
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+// HELLO
+////////////////////////////////////////////////////////////////////////////////
+
+static void
+hello_init(const unsigned state, struct selector_key *key) {
+    struct pop3     *p =  ATTACHMENT(key);
+    struct hello_st *d = &p->orig.ehlo;
+
+    d->rb                              = &p->read_buffer;
+    d->wb                              = &p->write_buffer;
+}
+
+static unsigned
+hello_read(struct selector_key *key) {
+    struct pop3 *p     =  ATTACHMENT(key);
+    struct hello_st *d = &p->orig.ehlo;
+    unsigned  ret      = EHLO;
+    buffer *b            = d->rb;
+    uint8_t *ptr;
+    size_t  count;
+    ssize_t  n;
+
+    ptr = buffer_write_ptr(b, &count);
+    n = recv(key->fd, ptr, count, 0);
+
+    if(n > 0) {
+        buffer_write_adv(b, n);
+        selector_status ss = SELECTOR_SUCCESS;
+        ss |= selector_set_interest_key(key, OP_NOOP);
+        ss |= selector_set_interest(key->s, p->client_fd, OP_WRITE);
+        if (ss != SELECTOR_SUCCESS) {
+            ret = ERROR;
+        }
+    } else {
+        ret = ERROR;
+    }
+
+    return ret;
+}
+
+static unsigned
+hello_write(struct selector_key *key) {
+    struct pop3 *p     =  ATTACHMENT(key);
+    struct hello_st *d = &p->orig.ehlo;
+
+    unsigned  ret     = EHLO;
+    buffer  *buffer   = d->rb;
+
+    ssize_t  n;
+
+    n = send_hello_status_line(key, buffer);
+
+    if (n == -1) {
+        ret = ERROR;
+    } 
+    else if (n == 0) {
+        selector_status ss = SELECTOR_SUCCESS;
+        ss |= selector_set_interest_key(key, OP_NOOP);
+        ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_READ);
+        ret = SELECTOR_SUCCESS == ss ? EHLO : ERROR;
+    } else {
+        selector_status ss = SELECTOR_SUCCESS;
+        ss |= selector_set_interest_key(key, OP_NOOP);
+        ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_WRITE);
+        ret = SELECTOR_SUCCESS == ss ? CAPA : ERROR;
+    }
+
+    return ret;
+}
+
+static ssize_t
+send_hello_status_line(struct selector_key *key, buffer * b) {
+    buffer *wb = ATTACHMENT(key)->orig.ehlo.wb;
+    uint8_t *rptr;
+
+    size_t count;
+    ssize_t n = 0;
+
+    size_t i = 0;
+
+    while (buffer_can_read(b) && n == 0) {
+        i++;
+        char c = buffer_read(b);
+        if (c == '\n') {
+            n = i;
+        }
+        buffer_write(wb, c);
+    }
+
+    if (n == 0) {
+        return 0;
+    }
+
+    rptr = buffer_read_ptr(wb, &count);
+
+    n = send(ATTACHMENT(key)->client_fd, rptr, count, MSG_NOSIGNAL);
+
+    buffer_reset(wb);
+
+    return n;
+}
+
+
