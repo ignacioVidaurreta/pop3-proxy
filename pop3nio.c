@@ -1,7 +1,7 @@
 /**
  * pop3nio.c  - controla el flujo de un proxy POP3 con sockets no bloqueantes
  */
-#include<stdio.h>
+#include <stdio.h>
 #include <stdlib.h>  // malloc
 #include <string.h>  // memset
 #include <assert.h>  // assert
@@ -15,7 +15,14 @@
 #include "include/buffer.h"
 #include "include/stm.h"
 #include "include/pop3nio.h"
+#include "include/selector.h"
+#include "include/server.h"
+#include "include/parser.h"
+#include "include/pop3.h"
+
 #define N(x) (sizeof(x)/sizeof((x)[0]))
+/** obtiene el struct (socks5 *) desde la llave de selección  */
+#define ATTACHMENT(key) ( (struct pop3 *)(key)->data)
 
 /** maquina de estados general */
 enum pop3_state {
@@ -62,25 +69,14 @@ enum pop3_state {
      * Recibe una respuesta del servidor origen y la procesa
      * 
      * Transiciones:
-     *     - RESPONSE_RECV        mientras la respuesta no este completa
-     *     - FILTER               si se recibe un mail para filtrar
-     *     - RESPONSE_SEND        si la respuesta no requiere procesamiento
-     *     - ERROR                ante cualquier error (IO/parseo)
+     *     - RESPONSE        mientras la respuesta no este completa
+     *     - REQUEST         una vez finalizado el envio del mensaje
+     *     - ERROR           ante cualquier error (IO/parseo)
      */
-    RESPONSE_RECV,
+    RESPONSE,
 
     /**
-     * Envia la respuesta del servidor origen al cliente
-     * 
-     * Transiciones:
-     *    - RESPONSE_SEND    mientras el mensaje no se haya enviado por completo
-     *    - REQUEST          una vez finalizado el envio del mensaje
-     *    - ERROR            ante cualquier error (IO/parseo)
-     */
-    RESPONSE_SEND,
-
-    /**
-     * envia el contenido del mail recivido al filtro para ser procesado
+     * envia el contenido del mail recibido al filtro para ser procesado
      *
      * Transiciones:
      *   - RESPONSE_SEND  una vez que el mensaje haya sido filtrado
@@ -139,12 +135,12 @@ struct pop3 {
     } orig;
 
     /** estados para el filter_fd */
-    union {
-        struct filter_st          filter;
-    } filter;
+    // union {
+    //     struct filter_st          filter;
+    // } filter;
 
     /** buffers para ser usados read_buffer, write_buffer.*/
-    uint8_t raw_buff_a[2048], raw_buff_b[2048]; //Si neecsitamos mas buffers, los podemos agregar aca.
+    uint8_t raw_buff_a[2048], raw_buff_b[2048]; //Si necesitamos más buffers, los podemos agregar aca.
     buffer read_buffer, write_buffer;
     
     /** cantidad de referencias a este objeto. si es uno se debe destruir */
@@ -154,11 +150,14 @@ struct pop3 {
     struct pop3 *next;
 };
 
-struct response_send_st {
+struct response_st {
     buffer                  *wb, *rb;
     int                     *fd;
 };
 
+struct response_recv {
+    buffer                  *response_buffer, *status_buffer;
+};
 struct request_st {
     buffer                  *buffer;
     int                     *fd;
@@ -216,9 +215,6 @@ finally:
     return ret;
 }
 
-/** obtiene el struct (socks5 *) desde la llave de selección  */
-#define ATTACHMENT(key) ( (struct socks5 *)(key)->data)
-
 /* declaración forward de los handlers de selección de una conexión
  * establecida entre un cliente y el proxy.
  */
@@ -269,6 +265,29 @@ fail:
     socks5_destroy(state);
 }
 
+static void response_init(const unsigned state, struct selector_key *key){
+    struct response_st *d = &ATTACHMENT(key)->client.response_send;
+
+    d->rb = &(ATTACHMENT(key)->read_buffer);
+    d->wb = &(ATTACHMENT(key)->write_buffer);
+};
+
+static unsigned response_read(struct selector_key *key){
+    struct response_st *d = &(ATTACHMENT(key)->client.response_send);
+    unsigned ret = RESPONSE;
+    bool error = false;
+    uint8_t *ptr;
+    size_t count;
+    ssize_t n;
+
+    struct state_manager *state; //TODO migrar con lo otro
+    count = read_from_server2(d->fd,d->rb, &error);
+    parse_response(d->rb, state);
+    write_response(d->fd, d->rb, state);
+    
+
+    return error? ERROR:state->state;
+}
 /** definición de handlers para cada estado */
 static const struct state_definition client_statbl[] = {
     {
@@ -287,7 +306,8 @@ static const struct state_definition client_statbl[] = {
         .on_read_ready    = request_read,
         .on_depature      = request_sent,
     },{
-        .state            = RESPONSE_RECV,
+        .state            = RESPONSE,
+        .on_arrival       = response_init,
         .on_read_ready    = response_read,
     },{
         .state            = RESPOND_SEND,
