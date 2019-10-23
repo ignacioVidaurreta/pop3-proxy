@@ -19,6 +19,7 @@
 #include "include/server.h"
 #include "include/parser.h"
 #include "include/pop3.h"
+#include "include/logger.h"
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 /** obtiene el struct (socks5 *) desde la llave de selección  */
@@ -166,7 +167,7 @@ struct hello_st {
     buffer               *rb, *wb;
 } ;
 
-struct response_send_st {
+struct response_st {
     buffer                  *wb, *rb;
     int                     *fd;
 };
@@ -312,16 +313,20 @@ static const struct state_definition client_statbl[] = {
         .on_block_ready   = connection_resolve_complete,
     }, {
         .state            = CONNECTING,
-        .on_arrival       = connection_start,
+        .on_arrival       = connecting,
     }, {
         .state            = EHLO,
-        .on_arrival       = ehlo_ready,
-        .on_read_ready    = capa_read,
-    },{
+        .on_arrival       = ehlo_init,
+        .on_read_ready    = ehlo_read,
+        .on_write_ready   = ehlo_write,
+    },
+    /* TODO Implement when we have pipelining
+    {
         .state            = CAPA,
         .on_arrival       = capa_init,
         .on_read_ready    = capa_read,
-    },{
+    },
+    */{
         .state            = REQUEST,
         .on_read_ready    = request_read,
         .on_depature      = request_sent,
@@ -477,7 +482,7 @@ connection_resolve_complete(struct selector_key *key) {
     unsigned           ret;
 
     if(p->origin_resolution == 0) {
-        p->erorr = "Couldn't resolve origin name server.";
+        p->error = "Couldn't resolve origin name server.";
         goto error;
     } else {
         p->origin_domain   = p->origin_resolution->ai_family;
@@ -537,7 +542,7 @@ connecting(struct selector_key *key) {
     int error;
     socklen_t len = sizeof(error);
     
-    d->origin_fd = key->fd;
+    p->origin_fd = key->fd;
 
     if (getsockopt(key->fd, SOL_SOCKET, SO_ERROR, &error, &len) < 0) {
         p->error = "Connection refused (while connecting to origin server).";
@@ -564,11 +569,11 @@ connecting(struct selector_key *key) {
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// HELLO
+// EHLO
 ////////////////////////////////////////////////////////////////////////////////
 
 static void
-hello_init(const unsigned state, struct selector_key *key) {
+ehlo_init(const unsigned state, struct selector_key *key) {
     struct pop3     *p =  ATTACHMENT(key);
     struct hello_st *d = &p->orig.ehlo;
 
@@ -577,7 +582,7 @@ hello_init(const unsigned state, struct selector_key *key) {
 }
 
 static unsigned
-hello_read(struct selector_key *key) {
+ehlo_read(struct selector_key *key) {
     struct pop3 *p     =  ATTACHMENT(key);
     struct hello_st *d = &p->orig.ehlo;
     unsigned  ret      = EHLO;
@@ -605,7 +610,7 @@ hello_read(struct selector_key *key) {
 }
 
 static unsigned
-hello_write(struct selector_key *key) {
+ehlo_write(struct selector_key *key) {
     struct pop3 *p     =  ATTACHMENT(key);
     struct hello_st *d = &p->orig.ehlo;
 
@@ -635,7 +640,7 @@ hello_write(struct selector_key *key) {
 }
 
 static ssize_t
-send_hello_status_line(struct selector_key *key, buffer * b) {
+send_ehlo_status_line(struct selector_key *key, buffer * b) {
     buffer *wb = ATTACHMENT(key)->orig.ehlo.wb;
     uint8_t *rptr;
 
