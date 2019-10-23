@@ -19,6 +19,7 @@
 #include "include/server.h"
 #include "include/parser.h"
 #include "include/pop3.h"
+#include "include/logger.h"
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 /** obtiene el struct (socks5 *) desde la llave de selección  */
@@ -160,6 +161,11 @@ struct pop3 {
     /** siguiente en el pool */
     struct pop3 *next;
 };
+
+struct hello_st {
+    /** buffer utilizado para I/O */
+    buffer               *rb, *wb;
+} ;
 
 struct response_st {
     buffer                  *wb, *rb;
@@ -307,16 +313,20 @@ static const struct state_definition client_statbl[] = {
         .on_block_ready   = connection_resolve_complete,
     }, {
         .state            = CONNECTING,
-        .on_arrival       = connection_start,
+        .on_arrival       = connecting,
     }, {
         .state            = EHLO,
-        .on_arrival       = ehlo_ready,
-        .on_read_ready    = capa_read,
-    },{
+        .on_arrival       = ehlo_init,
+        .on_read_ready    = ehlo_read,
+        .on_write_ready   = ehlo_write,
+    },
+    /* TODO Implement when we have pipelining
+    {
         .state            = CAPA,
         .on_arrival       = capa_init,
         .on_read_ready    = capa_read,
-    },{
+    },
+    */{
         .state            = REQUEST,
         .on_read_ready    = request_read,
         .on_depature      = request_sent,
@@ -472,7 +482,7 @@ connection_resolve_complete(struct selector_key *key) {
     unsigned           ret;
 
     if(p->origin_resolution == 0) {
-        p->erorr = "Couldn't resolve origin name server.";
+        p->error = "Couldn't resolve origin name server.";
         goto error;
     } else {
         p->origin_domain   = p->origin_resolution->ai_family;
@@ -532,7 +542,7 @@ connection_start(struct selector_key *key) {
     int error;
     socklen_t len = sizeof(error);
     
-    d->origin_fd = key->fd;
+    p->origin_fd = key->fd;
 
     if (getsockopt(key->fd, SOL_SOCKET, SO_ERROR, &error, &len) < 0) {
         p->error = "Connection refused (while connecting to origin server).";
@@ -555,3 +565,110 @@ connection_start(struct selector_key *key) {
     s |= selector_set_interest(key->s, p->client_fd, OP_NOOP);
     return SELECTOR_SUCCESS == s ? EHLO : ERROR;
 }
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+// EHLO
+////////////////////////////////////////////////////////////////////////////////
+
+static void
+ehlo_init(const unsigned state, struct selector_key *key) {
+    struct pop3     *p =  ATTACHMENT(key);
+    struct hello_st *d = &p->orig.ehlo;
+
+    d->rb                              = &p->read_buffer;
+    d->wb                              = &p->write_buffer;
+}
+
+static unsigned
+ehlo_read(struct selector_key *key) {
+    struct pop3 *p     =  ATTACHMENT(key);
+    struct hello_st *d = &p->orig.ehlo;
+    unsigned  ret      = EHLO;
+    buffer *b            = d->rb;
+    uint8_t *ptr;
+    size_t  count;
+    ssize_t  n;
+
+    ptr = buffer_write_ptr(b, &count);
+    n = recv(key->fd, ptr, count, 0);
+
+    if(n > 0) {
+        buffer_write_adv(b, n);
+        selector_status ss = SELECTOR_SUCCESS;
+        ss |= selector_set_interest_key(key, OP_NOOP);
+        ss |= selector_set_interest(key->s, p->client_fd, OP_WRITE);
+        if (ss != SELECTOR_SUCCESS) {
+            ret = ERROR;
+        }
+    } else {
+        ret = ERROR;
+    }
+
+    return ret;
+}
+
+static unsigned
+ehlo_write(struct selector_key *key) {
+    struct pop3 *p     =  ATTACHMENT(key);
+    struct hello_st *d = &p->orig.ehlo;
+
+    unsigned  ret     = EHLO;
+    buffer  *buffer   = d->rb;
+
+    ssize_t  n;
+
+    n = send_hello_status_line(key, buffer);
+
+    if (n == -1) {
+        ret = ERROR;
+    } 
+    else if (n == 0) {
+        selector_status ss = SELECTOR_SUCCESS;
+        ss |= selector_set_interest_key(key, OP_NOOP);
+        ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_READ);
+        ret = SELECTOR_SUCCESS == ss ? EHLO : ERROR;
+    } else {
+        selector_status ss = SELECTOR_SUCCESS;
+        ss |= selector_set_interest_key(key, OP_NOOP);
+        ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_WRITE);
+        ret = SELECTOR_SUCCESS == ss ? CAPA : ERROR;
+    }
+
+    return ret;
+}
+
+static ssize_t
+send_ehlo_status_line(struct selector_key *key, buffer * b) {
+    buffer *wb = ATTACHMENT(key)->orig.ehlo.wb;
+    uint8_t *rptr;
+
+    size_t count;
+    ssize_t n = 0;
+
+    size_t i = 0;
+
+    while (buffer_can_read(b) && n == 0) {
+        i++;
+        char c = buffer_read(b);
+        if (c == '\n') {
+            n = i;
+        }
+        buffer_write(wb, c);
+    }
+
+    if (n == 0) {
+        return 0;
+    }
+
+    rptr = buffer_read_ptr(wb, &count);
+
+    n = send(ATTACHMENT(key)->client_fd, rptr, count, MSG_NOSIGNAL);
+
+    buffer_reset(wb);
+
+    return n;
+}
+
+
