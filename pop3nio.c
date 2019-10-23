@@ -526,7 +526,7 @@ error:
 ///////      CONNECTING      ///////
 
 static unsigned
-connecting(struct selector_key *key) {
+connection_start(struct selector_key *key) {
     struct pop3 *p = ATTACHMENT(key);
     unsigned ret;
     int error;
