@@ -9,6 +9,7 @@
 #include <time.h>
 #include <unistd.h>  // close
 #include <pthread.h>
+#include <netdb.h>
 
 #include <arpa/inet.h>
 
@@ -20,10 +21,15 @@
 #include "include/parser.h"
 #include "include/pop3.h"
 #include "include/logger.h"
+#include "include/config.h"
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 /** obtiene el struct (socks5 *) desde la llave de selección  */
 #define ATTACHMENT(key) ( (struct pop3 *)(key)->data)
+
+extern struct config *options;
+
+extern struct metrics_manager *metrics;
 
 /** maquina de estados general */
 enum pop3_state {
@@ -135,17 +141,15 @@ struct pop3 {
     /** estados para el client_fd */
     union {
         struct request_st         request;
-        // struct response_send_st   response_send;
         // struct error_st           error;
     } client;
 
     /** estados para el origin_fd */
     union {
-        struct ehlo_st            ehlo;
-        struct capa_st            capa;
         struct request_st         conn;
-        struct response_recv      response_recv;
-    } orig;
+        struct response_st        response;
+        struct ehlo_st            ehlo;
+    } origin;
 
     /** estados para el filter_fd */
     // union {
@@ -163,7 +167,7 @@ struct pop3 {
     struct pop3 *next;
 };
 
-struct hello_st {
+struct ehlo_st {
     /** buffer utilizado para I/O */
     buffer               *rb, *wb;
 } ;
@@ -211,7 +215,7 @@ struct request_st {
 
 static const unsigned  max_pool  = 50; // tamaño máximo
 static unsigned        pool_size = 0;  // tamaño actual
-static struct socks5 * pool      = 0;  // pool propiamente dicho
+static struct pop3     *pool     = 0;  // pool propiamente dicho
 
 static const struct state_definition *
 pop3_describe_states(void);
@@ -305,14 +309,14 @@ fail:
 }
 
 static void response_init(const unsigned state, struct selector_key *key){
-    struct response_st *d = &ATTACHMENT(key)->client.response_send;
+    struct response_st *d = &ATTACHMENT(key)->origin.response;
 
     d->rb = &(ATTACHMENT(key)->read_buffer);
     d->wb = &(ATTACHMENT(key)->write_buffer);
 };
 
 static unsigned response_read(struct selector_key *key){
-    struct response_st *d = &(ATTACHMENT(key)->client.response_send);
+    struct response_st *d = &(ATTACHMENT(key)->origin.response);
     unsigned ret = RESPONSE;
     bool error = false;
     uint8_t *ptr;
@@ -370,53 +374,47 @@ pop3_describe_states(void) {
 ///////////////////////////////////////////////////////////////////////////////
 // Handlers top level de la conexión pasiva.
 // son los que emiten los eventos a la maquina de estados.
-static void
-pop3_done(struct selector_key* key);
+static void pop3_done(struct selector_key* key);
 
-static void
-pop3_read(struct selector_key *key) {
+static void pop3_read(struct selector_key *key) {
     struct state_machine *stm   = &ATTACHMENT(key)->stm;
-    const enum socks_v5state st = stm_handler_read(stm, key);
+    const enum pop3_state st = stm_handler_read(stm, key);
 
-    if(ERROR == st || DONE == st) {
-        socksv5_done(key);
+    if(st == ERROR || st == DONE) {
+        pop3_done(key);
     }
 }
 
-static void
-pop3_write(struct selector_key *key) {
+static void pop3_write(struct selector_key *key) {
     struct state_machine *stm   = &ATTACHMENT(key)->stm;
-    const enum socks_v5state st = stm_handler_write(stm, key);
+    const enum pop3_state st = stm_handler_write(stm, key);
 
-    if(ERROR == st || DONE == st) {
-        socksv5_done(key);
+    if(st == ERROR || st == DONE) {
+        pop3_done(key);
     }
 }
 
-static void
-pop3_block(struct selector_key *key) {
+static void pop3_block(struct selector_key *key) {
     struct state_machine *stm   = &ATTACHMENT(key)->stm;
-    const enum socks_v5state st = stm_handler_block(stm, key);
+    const enum pop3_state st = stm_handler_block(stm, key);
 
-    if(ERROR == st || DONE == st) {
-        socksv5_done(key);
+    if(st == ERROR || st == DONE) {
+        pop3_done(key);
     }
 }
 
-static void
-pop3_close(struct selector_key *key) {
-    socks5_destroy(ATTACHMENT(key));
+static void pop3_close(struct selector_key *key) {
+    pop3_destroy(ATTACHMENT(key));
 }
 
-static void
-pop3_done(struct selector_key* key) {
+static void pop3_done(struct selector_key* key) {
     const int fds[] = {
         ATTACHMENT(key)->client_fd,
         ATTACHMENT(key)->origin_fd,
     };
     for(unsigned i = 0; i < N(fds); i++) {
         if(fds[i] != -1) {
-            if(SELECTOR_SUCCESS != selector_unregister_fd(key->s, fds[i])) {
+            if(selector_unregister_fd(key->s, fds[i]) != SELECTOR_SUCCESS ) {
                 abort();
             }
             close(fds[i]);
@@ -479,9 +477,9 @@ connection_resolve_blocking(void *data) {
     };
 
     char buff[7];
-    snprintf(buff, sizeof(buff), "%hu",proxy->origin_port);
+    snprintf(buff, sizeof(buff), "%hu",options->origin_port);
 
-    getaddrinfo(proxy->origin_address, buff, &hints,&p->origin_resolution);
+    getaddrinfo(options->proxy_address, buff, &hints,&p->origin_resolution);
 
     selector_notify_block(key->s, key->fd);
 
@@ -492,65 +490,64 @@ connection_resolve_blocking(void *data) {
 /** procesa el resultado de la resolución de nombres */
 static unsigned
 connection_resolve_complete(struct selector_key *key) {
-    struct pop3       *p =  ATTACHMENT(key);
+    struct pop3       *pop =  ATTACHMENT(key);
     unsigned           ret;
 
-    if(p->origin_resolution == 0) {
-        p->error = "Couldn't resolve origin name server.";
+    if(pop->origin_resolution == NULL) {
+        pop->error = "Couldn't resolve origin name server.";
         goto error;
     } else {
-        p->origin_domain   = p->origin_resolution->ai_family;
-        p->origin_addr_len = p->origin_resolution->ai_addrlen;
-        memcpy(&p->origin_addr,
-               p->origin_resolution->ai_addr,
-               (size_t) p->origin_resolution->ai_addrlen);
-        p->origin_resolution_current = p->origin_resolution;
+        pop->origin_domain   = pop->origin_resolution->ai_family;
+        pop->origin_addr_len = pop->origin_resolution->ai_addrlen;
+        memcpy(&pop->origin_addr,
+               pop->origin_resolution->ai_addr,
+               (size_t) pop->origin_resolution->ai_addrlen);
+        pop->origin_resolution_current = pop->origin_resolution;
     }
 
     //OPEN SOCKET CONNECTION
-    int sock = socket(p->origin_domain, SOCK_STREAM, IPPROTO_TCP);
+    int sock = socket(pop->origin_domain, SOCK_STREAM, IPPROTO_TCP);
 
     if (sock < 0 || selector_fd_set_nio(sock) == -1) {
-        p->error = "Error creating socket for connectino with origin server";
+        pop->error = "Error creating socket for connectino with origin server";
         goto error;
     }
 
-    if (connect(sock, (const struct sockaddr *)&p->origin_addr, p->origin_addr_len) == -1) {
+    if (connect(sock, (const struct sockaddr *)&pop->origin_addr, pop->origin_addr_len) == -1) {
         if(errno == EINPROGRESS) {
             // dejamos de de pollear el socket del cliente
             selector_status st = selector_set_interest_key(key, OP_NOOP);
             if(SELECTOR_SUCCESS != st) {
-                p->error = "Error connecting to origin server";
+                pop->error = "Error connecting to origin server";
                 goto error;
             }
 
             // esperamos la conexion en el nuevo socket
             st = selector_register(key->s, sock, &pop3_handler, OP_WRITE, key->data);
             if(SELECTOR_SUCCESS != st) {
-                p->error = "Error connecting to origin server";
+                pop->error = "Error connecting to origin server";
                 goto error;
             }
-            p->references += 1;
+            pop->references += 1;
         } else {
             selector_unregister_fd(key->s, sock);
-            p->error = "Error connecting to origin server";
+            pop->error = "Error connecting to origin server";
             goto error;
         }
     } else {
-        p->error = "Error connecting to origin server";
+        pop->error = "Error connecting to origin server";
         goto error;
     }
 
     return CONNECTING;
 error:
-    logger(ERROR, p->error, get_time());
+    print_error(pop->error, get_time());
     return ERROR;
 }
 
 ///////      CONNECTING      ///////
 
-static unsigned
-connecting(struct selector_key *key) {
+static unsigned connecting(struct selector_key *key) {
     struct pop3 *p = ATTACHMENT(key);
     unsigned ret;
     int error;
@@ -589,7 +586,7 @@ connecting(struct selector_key *key) {
 static void
 ehlo_init(const unsigned state, struct selector_key *key) {
     struct pop3     *p =  ATTACHMENT(key);
-    struct hello_st *d = &p->orig.ehlo;
+    struct ehlo_st *d = &p->origin.ehlo;
 
     d->rb                              = &p->read_buffer;
     d->wb                              = &p->write_buffer;
@@ -598,9 +595,9 @@ ehlo_init(const unsigned state, struct selector_key *key) {
 static unsigned
 ehlo_read(struct selector_key *key) {
     struct pop3 *p     =  ATTACHMENT(key);
-    struct hello_st *d = &p->orig.ehlo;
+    struct ehlo_st *d  = &p->origin.ehlo;
     unsigned  ret      = EHLO;
-    buffer *b            = d->rb;
+    buffer *b          = d->rb;
     uint8_t *ptr;
     size_t  count;
     ssize_t  n;
@@ -626,7 +623,7 @@ ehlo_read(struct selector_key *key) {
 static unsigned
 ehlo_write(struct selector_key *key) {
     struct pop3 *p     =  ATTACHMENT(key);
-    struct hello_st *d = &p->orig.ehlo;
+    struct ehlo_st *d = &p->origin.ehlo;
 
     unsigned  ret     = EHLO;
     buffer  *buffer   = d->rb;
@@ -655,7 +652,7 @@ ehlo_write(struct selector_key *key) {
 
 static ssize_t
 send_ehlo_status_line(struct selector_key *key, buffer * b) {
-    buffer *wb = ATTACHMENT(key)->orig.ehlo.wb;
+    buffer *wb = ATTACHMENT(key)->origin.ehlo.wb;
     uint8_t *rptr;
 
     size_t count;
