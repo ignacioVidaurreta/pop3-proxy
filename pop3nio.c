@@ -127,6 +127,7 @@ struct pop3 {
     socklen_t                     origin_addr_len;
     int                           origin_domain;
     int                           origin_fd;
+    bool                          has_pipelining;
 
     /** maquinas de estados */
     struct state_machine          stm;
@@ -134,8 +135,8 @@ struct pop3 {
     /** estados para el client_fd */
     union {
         struct request_st         request;
-        struct response_send_st   response_send;
-        struct error_st           error;
+        // struct response_send_st   response_send;
+        // struct error_st           error;
     } client;
 
     /** estados para el origin_fd */
@@ -153,7 +154,7 @@ struct pop3 {
 
     /** buffers para ser usados read_buffer, write_buffer.*/
     uint8_t raw_buff_a[2048], raw_buff_b[2048]; //Si necesitamos más buffers, los podemos agregar aca.
-    buffer read_buffer, write_buffer;
+    buffer read_buffer, write_buffer, request_buffer, cmd_request_buffer;
     
     /** cantidad de referencias a este objeto. si es uno se debe destruir */
     unsigned references;
@@ -175,9 +176,29 @@ struct response_st {
 struct response_recv {
     buffer                  *response_buffer, *status_buffer;
 };
+
+enum request_cmd_type {
+            RETR,
+            LIST,
+            CAPA,
+            TOP,
+            USER,
+            PASS,
+            DELE,
+            QUIT,
+            DEFAULT,
+};
+
+struct next_request {
+    enum request_cmd_type cmd_type;
+    struct next_request   *next;
+};
 struct request_st {
-    buffer                  *buffer;
-    int                     *fd;
+    buffer                      *buffer, *cmd_buffer, *aux_buffer;
+    int                         *fd;
+    enum request_cmd_type       cmd_type;
+    struct next_request         *next_cmd_type;
+    struct next_request         *last_cmd_type;
 };
 
 
@@ -196,17 +217,18 @@ static const struct state_definition *
 pop3_describe_states(void);
 
 /** crea un nuevo `struct pop3' */
-static struct pop3 *
-pop3_new(int client_fd) {
+static struct pop3 * 
+pop3_new(int client_fd){
     struct pop3 *ret;
 
     if(pool == NULL) {
         ret = malloc(sizeof(*ret));
-    } else {
+    }else {
         ret       = pool;
         pool      = pool->next;
         ret->next = 0;
     }
+
     if(ret == NULL) {
         goto finally;
     }
@@ -306,6 +328,7 @@ static unsigned response_read(struct selector_key *key){
     return error? ERROR:state->state;
 }
 /** definición de handlers para cada estado */
+// TODO(@team): CAPA STATE
 static const struct state_definition client_statbl[] = {
     {
         .state            = RESOLVE,
@@ -319,25 +342,16 @@ static const struct state_definition client_statbl[] = {
         .on_arrival       = ehlo_init,
         .on_read_ready    = ehlo_read,
         .on_write_ready   = ehlo_write,
-    },
-    /* TODO Implement when we have pipelining
-    {
-        .state            = CAPA,
-        .on_arrival       = capa_init,
-        .on_read_ready    = capa_read,
-    },
-    */{
+    },{
         .state            = REQUEST,
+        .on_arrival       = request_init,
         .on_read_ready    = request_read,
-        .on_depature      = request_sent,
+        .on_write_ready   = request_write,
     },{
         .state            = RESPONSE,
         .on_arrival       = response_init,
         .on_read_ready    = response_read,
     },{
-        .state            = RESPOND_SEND,
-        .on_write_ready   = response_send,
-    }, {
         .state            = FILTER,
         .on_arrival       = filter_init,
         .on_write_ready   = filter_send,
@@ -671,4 +685,204 @@ send_ehlo_status_line(struct selector_key *key, buffer * b) {
     return n;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// REQUEST
+////////////////////////////////////////////////////////////////////////////////
+/** inicializa las variables del estado REQUEST */
+static void request_init(const unsigned state, struct selector_key *key) {
+    struct request_st * d = &ATTACHMENT(key)->client.request;
+    d->buffer = &ATTACHMENT(key)->request_buffer;
+    d->cmd_buffer = &ATTACHMENT(key)->cmd_request_buffer;
+}
 
+/** Lee la request del cliente */
+static unsigned request_read(struct selector_key *key){
+    struct request_st *d = &ATTACHMENT(key)->client.request;
+    enum pop3_state ret  = REQUEST;
+
+    buffer *buff            = d->buffer;
+    uint8_t *ptr;
+    size_t  count;
+    ssize_t  n;
+
+    ptr = buffer_write_ptr(buff, &count);
+    n = recv(key->fd, ptr, count, 0);
+
+    if(n > 0 || buffer_can_read(buff)) {
+        buffer_write_adv(buff, n);
+        selector_status ss = SELECTOR_SUCCESS;
+        ss |= selector_set_interest_key(key, OP_NOOP);
+        ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_WRITE);
+        ret = SELECTOR_SUCCESS == ss ? REQUEST : ERROR;
+    } else {
+        ret = ERROR;
+    }
+
+    if(ret == ERROR) {
+        //print_error_with_address(ATTACHMENT(key)->client_addr, "Error reading client response"); TODO(Nachito)
+    }
+    return ret;
+}
+
+/** Escribe la request en el server */
+static unsigned request_write(struct selector_key *key) {
+    struct request_st *d = &ATTACHMENT(key)->client.request;
+    enum pop3_state ret      = REQUEST;
+
+    buffer *b          = d->buffer;
+    ssize_t  n;
+
+    n = send_next_request(key, b);
+
+    if(n == -1) {
+        ret = ERROR;
+    } else if (n == 0) {
+        selector_status ss = SELECTOR_SUCCESS;
+        ss |= selector_set_interest_key(key, OP_NOOP);
+        ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_READ);
+        ret = SELECTOR_SUCCESS == ss ? REQUEST : ERROR;
+    }
+    else {
+        if (ATTACHMENT(key)->has_pipelining) {
+            if (buffer_can_read(b)) {
+                if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_WRITE)) {
+                    ret = REQUEST;
+                } else {
+                    ret = ERROR;
+                }
+            }
+            else {
+                buffer *ab            = d->aux_buffer;
+                uint8_t *aptr;
+                size_t  count;
+
+                aptr = buffer_read_ptr(ab, &count);
+                n = send(ATTACHMENT(key)->origin_fd, aptr, count, MSG_NOSIGNAL);
+                buffer_read_adv(ab, n);
+
+                struct next_request *aux = ATTACHMENT(key)->client.request.next_cmd_type;
+                ATTACHMENT(key)->client.request.cmd_type = aux->cmd_type;
+                ATTACHMENT(key)->client.request.next_cmd_type = aux->next;
+                free(aux);
+                if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_READ)) {
+                    ret = RESPONSE;
+                } else {
+                    ret = ERROR;
+                }
+            }
+        }
+        else {
+            if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_READ)) {
+                ret = RESPONSE;
+            } else {
+                ret = ERROR;
+            }
+        }
+    }
+
+    if(ret == ERROR) {
+        print_error_message_with_client_ip(ATTACHMENT(key)->client_addr, "error writing client request to origin server");
+    }
+
+    return ret;
+}
+
+void assign_cmd(struct selector_key *key, char *cmd, int cmds_read){
+    if (strcasecmp(cmd, "RETR") == 0) {
+        ATTACHMENT(key)->client.request.cmd_type = RETR;
+    }   
+    else if (strcasecmp(cmd, "LIST") == 0 && cmds_read == 1) {
+        ATTACHMENT(key)->client.request.cmd_type = LIST;
+    }
+    else if (strcasecmp(cmd, "CAPA") == 0) {
+        ATTACHMENT(key)->client.request.cmd_type = CAPA;
+    }
+    else if (strcasecmp(cmd, "TOP") == 0) {
+        ATTACHMENT(key)->client.request.cmd_type = TOP;
+    }
+    else if (strcasecmp(cmd, "USER") == 0) {
+        ATTACHMENT(key)->client.request.cmd_type = USER;
+    }
+    else if (strcasecmp(cmd, "PASS") == 0) {
+        ATTACHMENT(key)->client.request.cmd_type = PASS;
+    }
+    else if (strcasecmp(cmd, "DELE") == 0) {
+        ATTACHMENT(key)->client.request.cmd_type = DELE;
+    }   
+    else if (strcasecmp(cmd, "QUIT") == 0) {
+        ATTACHMENT(key)->client.request.cmd_type = QUIT;
+    }
+    else {
+        ATTACHMENT(key)->client.request.cmd_type = DEFAULT;
+    }   
+}
+
+static ssize_t
+send_next_request(struct selector_key *key, buffer *b) {
+    buffer *cb            = ATTACHMENT(key)->client.request.cmd_buffer;
+    uint8_t *cptr;
+
+    size_t count;
+    ssize_t n = 0;
+
+    size_t i = 0;
+
+    if (!buffer_can_read(b))
+        return 0;
+
+    while (buffer_can_read(b) && n == 0) {
+        i++;
+        char c = buffer_read(b);
+        if (c == '\n') {
+            n = i;
+        }
+        buffer_write(cb, c);
+    }
+
+    if (n == 0) {
+        return 0;
+    }
+
+    cptr = buffer_read_ptr(cb, &count);
+
+    int cmd_n;
+    char cmd[16], arg1[32], arg2[32], extra[5];
+    char * aux = malloc(count+1);
+    memcpy(aux, cptr, count);
+    aux[count] = '\0';
+    cmd_n = sscanf(aux, "%s %s %s %s", cmd, arg1, arg2, extra);
+
+    assign_cmd(key, cmd, cmd_n);
+
+    free(aux);
+
+    if (ATTACHMENT(key)->has_pipelining) {
+        struct next_request *next = malloc(sizeof(next));
+        next->cmd_type = ATTACHMENT(key)->client.request.cmd_type;
+        next->next = NULL;
+
+        if (ATTACHMENT(key)->client.request.last_cmd_type == NULL) {
+            ATTACHMENT(key)->client.request.next_cmd_type = next;
+            ATTACHMENT(key)->client.request.last_cmd_type = next;
+        }
+        else {
+            ATTACHMENT(key)->client.request.last_cmd_type->next = next;
+            ATTACHMENT(key)->client.request.last_cmd_type = next;
+        }
+
+        buffer *ab = ATTACHMENT(key)->client.request.aux_buffer;
+        uint8_t *aptr;
+        size_t acount;
+
+        aptr = buffer_write_ptr(ab, &acount);
+        memcpy(aptr, cptr, count);
+        buffer_write_adv(ab, count);
+    }
+    else {
+        n = send(ATTACHMENT(key)->origin_fd, cptr, count, MSG_NOSIGNAL);
+    }
+
+    buffer_reset(cb);
+
+    return n;  
+}
