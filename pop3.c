@@ -22,6 +22,7 @@
 #include "include/buffer.h"
 #include "include/metrics.h"
 #include "include/transformations.h"
+#include "include/pop3nio.h"
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 #define LOCALHOST "127.0.0.1"
@@ -91,11 +92,11 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
     }
 
     char buffer[BUFFER_MAX_SIZE];
-    struct buffer_t *expandable_buffer;
-    expandable_buffer = init_buffer();
+   // struct buffer_t *expandable_buffer;
+    //expandable_buffer = init_buffer();
 
 
-    while(state->state != END){
+    while(state->state != DONE){
         switch(state->state) {
             case RESPONSE:
                 memset(buffer,0,BUFFER_MAX_SIZE);
@@ -109,6 +110,7 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
                 write_to_server(server_fd, buffer, state);
                 break;
             case FILTER:
+            /*
                 if(options->parse_completely){
                     int chars_read = read_from_server(server_fd, expandable_buffer->buffer + expandable_buffer->write_pointer);
                     read_multiline_command(expandable_buffer->buffer, expandable_buffer->write_pointer, expandable_buffer->curr_length, state);
@@ -128,6 +130,7 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
                     write_response(fd, buffer, state);
                     update_external_process_data(state);
                 }
+                */
                 break;
             default: 
                 print_error("Proxy entered into invalid state", get_time());

@@ -67,10 +67,10 @@ void read_multiline_command(char buffer[], int start, int end, struct state_mana
 
 }
 
-void parse_response(char* buffer, struct state_manager* state) {
+void parse_response(uint8_t* buffer, struct state_manager* state) {
     if(state->is_single_line){
         if(strcmp(buffer, "+OK Logging out\r\n") == 0 || strcmp(buffer, "+OK Logging out.\r\n") == 0) {
-            state->state = END;
+            state->state = DONE;
         }
         else{
             state->state = REQUEST;

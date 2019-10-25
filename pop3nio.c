@@ -1,17 +1,15 @@
-/**
- * pop3nio.c  - controla el flujo de un proxy POP3 con sockets no bloqueantes
- */
 #include <stdio.h>
 #include <stdlib.h>  // malloc
 #include <string.h>  // memset
+#include <strings.h> // strncasecmp
 #include <assert.h>  // assert
 #include <errno.h>
-#include <time.h>
 #include <unistd.h>  // close
-#include <pthread.h>
-#include <netdb.h>
-
 #include <arpa/inet.h>
+#include <netdb.h>
+#include <sys/wait.h>
+#include <pthread.h>
+#include <poll.h>
 
 #include "include/buffer.h"
 #include "include/stm.h"
@@ -22,6 +20,7 @@
 #include "include/pop3.h"
 #include "include/logger.h"
 #include "include/config.h"
+#include "include/client.h"
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 /** obtiene el struct (socks5 *) desde la llave de selección  */
@@ -30,181 +29,6 @@
 extern struct config *options;
 
 extern struct metrics_manager *metrics;
-
-/** maquina de estados general */
-enum pop3_state {
-  /**
-     * Resuelve la direccion del servidor de origen
-     *
-     * Transiciones:
-     *   - CONNECTING     mientras el mensaje no esté completo
-     *   - ERROR    ante cualquier error de conexion
-     */
-    RESOLVE,
-
-   /**
-     * Se conecta con el servidor de origen.
-     *
-     * Transiciones:
-     *   - CAPA     mientras el mensaje no esté completo
-     *   - ERROR    ante cualquier error de conexion
-     */
-    CONNECTING,
-
-    /**
-     * Recibe el mensaje de bienvenida del servidor de origen
-     *
-     * Transiciones:
-     *   - CAPA     mientras el mensaje no esté completo
-     *   - ERROR    ante cualquier error (IO/parseo)
-     */
-    EHLO,
-
-    /**
-     * Comprueba que el servidor origen tenga capacidad de pipelining
-     *
-     * Transiciones:
-     *   - REQUEST       mientras el mensaje no esté completo
-     *   - RESPONSE      si el mensajte esta completo y transmitido por completo
-     *   - ERROR         ante cualquier error (IO/parseo)
-     */
-    CAPA,
-
-
-    /**
-     * Recibe un pedido del cliente y lo transmite al host
-     *
-     * Transiciones:
-     *   - REQUEST       mientras el mensaje no esté completo
-     *   - RESPONSE      si el mensajte esta completo y transmitido por completo
-     *   - ERROR         ante cualquier error (IO/parseo)
-     */
-    REQUEST,
-
-    /**
-     * Recibe una respuesta del servidor origen y la procesa
-     * 
-     * Transiciones:
-     *     - RESPONSE        mientras la respuesta no este completa
-     *     - REQUEST         una vez finalizado el envio del mensaje
-     *     - ERROR           ante cualquier error (IO/parseo)
-     */
-    RESPONSE,
-
-    /**
-     * envia el contenido del mail recibido al filtro para ser procesado
-     *
-     * Transiciones:
-     *   - RESPONSE_SEND  una vez que el mensaje haya sido filtrado
-     *   - ERROR        ante error durante la ejecucion/conexion con de filtro.
-     */
-    FILTER,
-
-    // estados terminales
-    DONE,
-    ERROR,
-};
-
-/*
- * Si bien cada estado tiene su propio struct que le da un alcance
- * acotado, disponemos de la siguiente estructura para hacer una única
- * alocación cuando recibimos la conexión.
- *
- * Se utiliza un contador de referencias (references) para saber cuando debemos
- * liberarlo finalmente, y un pool para reusar alocaciones previas.
- */
-struct pop3 {
-    /** información del cliente */
-    struct sockaddr_storage       client_addr;
-    socklen_t                     client_addr_len;
-    int                           client_fd;
-
-    char*                         error;
-
-    char*                         client_username;
-
-    /** resolución de la dirección del origin server */
-    struct addrinfo              *origin_resolution;
-    /** intento actual de la dirección del origin server */
-    struct addrinfo              *origin_resolution_current;
-
-    /** información del origin server */
-    struct sockaddr_storage       origin_addr;
-    socklen_t                     origin_addr_len;
-    int                           origin_domain;
-    int                           origin_fd;
-    bool                          has_pipelining;
-
-    /** maquinas de estados */
-    struct state_machine          stm;
-
-    /** estados para el client_fd */
-    union {
-        struct request_st         request;
-        // struct error_st           error;
-    } client;
-
-    /** estados para el origin_fd */
-    union {
-        struct request_st         conn;
-        struct response_st        response;
-        struct ehlo_st            ehlo;
-    } origin;
-
-    /** estados para el filter_fd */
-    // union {
-    //     struct filter_st          filter;
-    // } filter;
-
-    /** buffers para ser usados read_buffer, write_buffer.*/
-    uint8_t raw_buff_a[2048], raw_buff_b[2048]; //Si necesitamos más buffers, los podemos agregar aca.
-    buffer read_buffer, write_buffer, request_buffer, cmd_request_buffer;
-    
-    /** cantidad de referencias a este objeto. si es uno se debe destruir */
-    unsigned references;
-
-    /** siguiente en el pool */
-    struct pop3 *next;
-};
-
-struct ehlo_st {
-    /** buffer utilizado para I/O */
-    buffer               *rb, *wb;
-} ;
-
-struct response_st {
-    buffer                  *wb, *rb;
-    int                     *fd;
-};
-
-struct response_recv {
-    buffer                  *response_buffer, *status_buffer;
-};
-
-enum request_cmd_type {
-            RETR,
-            LIST,
-            CAPA,
-            TOP,
-            USER,
-            PASS,
-            DELE,
-            QUIT,
-            DEFAULT,
-};
-
-struct next_request {
-    enum request_cmd_type cmd_type;
-    struct next_request   *next;
-};
-struct request_st {
-    buffer                      *buffer, *cmd_buffer, *aux_buffer;
-    int                         *fd;
-    enum request_cmd_type       cmd_type;
-    struct next_request         *next_cmd_type;
-    struct next_request         *last_cmd_type;
-};
-
 
 /**
  * Pool de `struct pop3', para ser reusados.
@@ -258,6 +82,75 @@ finally:
     return ret;
 }
 
+static ssize_t send_next_request(struct selector_key *key, buffer *b) {
+    buffer *cb            = ATTACHMENT(key)->client.request.cmd_buffer;
+    uint8_t *cptr;
+
+    size_t count;
+    ssize_t n = 0;
+
+    size_t i = 0;
+
+    if (!buffer_can_read(b))
+        return 0;
+
+    while (buffer_can_read(b) && n == 0) {
+        i++;
+        char c = buffer_read(b);
+        if (c == '\n') {
+            n = i;
+        }
+        buffer_write(cb, c);
+    }
+
+    if (n == 0) {
+        return 0;
+    }
+
+    cptr = buffer_read_ptr(cb, &count);
+
+    int cmd_n;
+    char cmd[16], arg1[32], arg2[32], extra[5];
+    char * aux = malloc(count+1);
+    memcpy(aux, cptr, count);
+    aux[count] = '\0';
+    cmd_n = sscanf(aux, "%s %s %s %s", cmd, arg1, arg2, extra);
+
+    assign_cmd(key, cmd, cmd_n);
+
+    free(aux);
+
+    if (ATTACHMENT(key)->has_pipelining) {
+        struct next_request *next = malloc(sizeof(next));
+        next->cmd_type = ATTACHMENT(key)->client.request.cmd_type;
+        next->next = NULL;
+
+        if (ATTACHMENT(key)->client.request.last_cmd_type == NULL) {
+            ATTACHMENT(key)->client.request.next_cmd_type = next;
+            ATTACHMENT(key)->client.request.last_cmd_type = next;
+        }
+        else {
+            ATTACHMENT(key)->client.request.last_cmd_type->next = next;
+            ATTACHMENT(key)->client.request.last_cmd_type = next;
+        }
+
+        buffer *ab = ATTACHMENT(key)->client.request.aux_buffer;
+        uint8_t *aptr;
+        size_t acount;
+
+        aptr = buffer_write_ptr(ab, &acount);
+        memcpy(aptr, cptr, count);
+        buffer_write_adv(ab, count);
+    }
+    else {
+        n = send(ATTACHMENT(key)->origin_fd, cptr, count, MSG_NOSIGNAL);
+    }
+
+    buffer_reset(cb);
+
+    return n;  
+}
+
 /* declaración forward de los handlers de selección de una conexión
  * establecida entre un cliente y el proxy.
  */
@@ -305,7 +198,7 @@ fail:
     if(client != -1) {
         close(client);
     }
-    socks5_destroy(state);
+    pop3_destroy(state);
 }
 
 static void response_init(const unsigned state, struct selector_key *key){
@@ -313,7 +206,7 @@ static void response_init(const unsigned state, struct selector_key *key){
 
     d->rb = &(ATTACHMENT(key)->read_buffer);
     d->wb = &(ATTACHMENT(key)->write_buffer);
-};
+}
 
 static unsigned response_read(struct selector_key *key){
     struct response_st *d = &(ATTACHMENT(key)->origin.response);
@@ -324,53 +217,14 @@ static unsigned response_read(struct selector_key *key){
     ssize_t n;
 
     struct state_manager *state; //TODO migrar con lo otro
-    count = read_from_server2(d->fd,d->rb, &error);
-    parse_response(d->rb, state);
+    count = read_from_server2(*(d->fd),d->rb, &error);
+    parse_response(d->rb->read, state);
     write_response(d->fd, d->rb, state);
     
 
     return error? ERROR:state->state;
 }
-/** definición de handlers para cada estado */
-// TODO(@team): CAPA STATE
-static const struct state_definition client_statbl[] = {
-    {
-        .state            = RESOLVE,
-        .on_arrival       = connection_resolve,
-        .on_block_ready   = connection_resolve_complete,
-    }, {
-        .state            = CONNECTING,
-        .on_arrival       = connecting,
-    }, {
-        .state            = EHLO,
-        .on_arrival       = ehlo_init,
-        .on_read_ready    = ehlo_read,
-        .on_write_ready   = ehlo_write,
-    },{
-        .state            = REQUEST,
-        .on_arrival       = request_init,
-        .on_read_ready    = request_read,
-        .on_write_ready   = request_write,
-    },{
-        .state            = RESPONSE,
-        .on_arrival       = response_init,
-        .on_read_ready    = response_read,
-    },{
-        .state            = FILTER,
-        .on_arrival       = filter_init,
-        .on_write_ready   = filter_send,
-        .on_read_ready    = filter_recv,
-    }, {
-        .state            = DONE,
-    },{
-        .state            = ERROR,
-    }
-};
 
-static const struct state_definition *
-pop3_describe_states(void) {
-    return client_statbl;
-}
 ///////////////////////////////////////////////////////////////////////////////
 // Handlers top level de la conexión pasiva.
 // son los que emiten los eventos a la maquina de estados.
@@ -814,72 +668,45 @@ void assign_cmd(struct selector_key *key, char *cmd, int cmds_read){
     }   
 }
 
-static ssize_t
-send_next_request(struct selector_key *key, buffer *b) {
-    buffer *cb            = ATTACHMENT(key)->client.request.cmd_buffer;
-    uint8_t *cptr;
 
-    size_t count;
-    ssize_t n = 0;
-
-    size_t i = 0;
-
-    if (!buffer_can_read(b))
-        return 0;
-
-    while (buffer_can_read(b) && n == 0) {
-        i++;
-        char c = buffer_read(b);
-        if (c == '\n') {
-            n = i;
-        }
-        buffer_write(cb, c);
+/** definición de handlers para cada estado */
+// TODO(@team): CAPA STATE
+static const struct state_definition client_statbl[] = {
+    {
+        .state            = RESOLVE,
+        .on_arrival       = connection_resolve,
+        .on_block_ready   = connection_resolve_complete,
+    }, {
+        .state            = CONNECTING,
+        .on_arrival       = connecting,
+    }, {
+        .state            = EHLO,
+        .on_arrival       = ehlo_init,
+        .on_read_ready    = ehlo_read,
+        .on_write_ready   = ehlo_write,
+    },{
+        .state            = REQUEST,
+        .on_arrival       = request_init,
+        .on_read_ready    = request_read,
+        .on_write_ready   = request_write,
+    },{
+        .state            = RESPONSE,
+        .on_arrival       = response_init,
+        .on_read_ready    = response_read,
+    },
+    // {
+    //     .state            = FILTER,
+    //     .on_arrival       = filter_init,
+    //     .on_write_ready   = filter_send,
+    //     .on_read_ready    = filter_recv,
+    // },
+     {
+        .state            = DONE,
+    },{
+        .state            = ERROR,
     }
+};
 
-    if (n == 0) {
-        return 0;
-    }
-
-    cptr = buffer_read_ptr(cb, &count);
-
-    int cmd_n;
-    char cmd[16], arg1[32], arg2[32], extra[5];
-    char * aux = malloc(count+1);
-    memcpy(aux, cptr, count);
-    aux[count] = '\0';
-    cmd_n = sscanf(aux, "%s %s %s %s", cmd, arg1, arg2, extra);
-
-    assign_cmd(key, cmd, cmd_n);
-
-    free(aux);
-
-    if (ATTACHMENT(key)->has_pipelining) {
-        struct next_request *next = malloc(sizeof(next));
-        next->cmd_type = ATTACHMENT(key)->client.request.cmd_type;
-        next->next = NULL;
-
-        if (ATTACHMENT(key)->client.request.last_cmd_type == NULL) {
-            ATTACHMENT(key)->client.request.next_cmd_type = next;
-            ATTACHMENT(key)->client.request.last_cmd_type = next;
-        }
-        else {
-            ATTACHMENT(key)->client.request.last_cmd_type->next = next;
-            ATTACHMENT(key)->client.request.last_cmd_type = next;
-        }
-
-        buffer *ab = ATTACHMENT(key)->client.request.aux_buffer;
-        uint8_t *aptr;
-        size_t acount;
-
-        aptr = buffer_write_ptr(ab, &acount);
-        memcpy(aptr, cptr, count);
-        buffer_write_adv(ab, count);
-    }
-    else {
-        n = send(ATTACHMENT(key)->origin_fd, cptr, count, MSG_NOSIGNAL);
-    }
-
-    buffer_reset(cb);
-
-    return n;  
+static const struct state_definition *pop3_describe_states(void) {
+    return client_statbl;
 }
