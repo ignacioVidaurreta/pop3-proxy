@@ -1,7 +1,9 @@
 #ifndef POP3NIO__H
 #define POP3NIO__H
 
+#include <sys/socket.h> 
 #include "stm.h"
+#include "buffer.h"
 
 struct response_st {
     buffer                  *wb, *rb;
@@ -181,7 +183,6 @@ struct pop3 {
 void pop3filter_passive_accept();
 void pop3_destroy(struct pop3 *state);
 void assign_cmd(struct selector_key *key, char *cmd, int cmds_read);
-static void* connection_resolve_blocking(void *data);
 
 
 

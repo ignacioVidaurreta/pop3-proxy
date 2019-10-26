@@ -281,32 +281,6 @@ static void pop3_done(struct selector_key* key) {
 ///////////       Funciones de estados        ///////////
 /////////////////////////////////////////////////////////
 
-
-///////      RESOLVE      ///////
-
-// Resolucion de nombre del origin server
-static unsigned
-connection_resolve(struct selector_key *key) {
-    unsigned ret;
-    pthread_t tid;
-
-    struct selector_key* k = malloc(sizeof(*key));
-    if(k == NULL) {
-        ret = ERROR;
-    }
-    else {
-        memcpy(k, key, sizeof(*k));
-        if(pthread_create(&tid, 0, connection_resolve_blocking, k) == -1) {
-            ret = ERROR;
-        } 
-        else{
-            ret = RESOLVE;
-            selector_set_interest_key(key, OP_NOOP);
-        }
-    }
-    return ret;
-}
-
 /**
  * Realiza la resolución de DNS bloqueante.
  *
@@ -333,13 +307,40 @@ connection_resolve_blocking(void *data) {
     char buff[7];
     snprintf(buff, sizeof(buff), "%hu",options->origin_port);
 
-    getaddrinfo(options->proxy_address, buff, &hints,&p->origin_resolution);
+    getaddrinfo(options->proxy_address, buff, &hints, &p->origin_resolution);
 
     selector_notify_block(key->s, key->fd);
 
     free(data);
     return 0;
 }
+
+///////      RESOLVE      ///////
+
+// Resolucion de nombre del origin server
+static unsigned
+connection_resolve(struct selector_key *key) {
+    unsigned ret;
+    pthread_t tid;
+
+    struct selector_key* k = malloc(sizeof(*key));
+    if(k == NULL) {
+        ret = ERROR;
+    }
+    else {
+        memcpy(k, key, sizeof(*k));
+        if(pthread_create(&tid, 0, connection_resolve_blocking, k) == -1) {
+            ret = ERROR;
+        } 
+        else{
+            ret = RESOLVE;
+            selector_set_interest_key(key, OP_NOOP);
+        }
+    }
+    return ret;
+}
+
+
 
 /** procesa el resultado de la resolución de nombres */
 static unsigned
@@ -474,36 +475,6 @@ ehlo_read(struct selector_key *key) {
     return ret;
 }
 
-static unsigned
-ehlo_write(struct selector_key *key) {
-    struct pop3 *p     =  ATTACHMENT(key);
-    struct ehlo_st *d = &p->origin.ehlo;
-
-    unsigned  ret     = EHLO;
-    buffer  *buffer   = d->rb;
-
-    ssize_t  n;
-
-    n = send_hello_status_line(key, buffer);
-
-    if (n == -1) {
-        ret = ERROR;
-    } 
-    else if (n == 0) {
-        selector_status ss = SELECTOR_SUCCESS;
-        ss |= selector_set_interest_key(key, OP_NOOP);
-        ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_READ);
-        ret = SELECTOR_SUCCESS == ss ? EHLO : ERROR;
-    } else {
-        selector_status ss = SELECTOR_SUCCESS;
-        ss |= selector_set_interest_key(key, OP_NOOP);
-        ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_WRITE);
-        ret = SELECTOR_SUCCESS == ss ? CAPA : ERROR;
-    }
-
-    return ret;
-}
-
 static ssize_t
 send_ehlo_status_line(struct selector_key *key, buffer * b) {
     buffer *wb = ATTACHMENT(key)->origin.ehlo.wb;
@@ -535,6 +506,38 @@ send_ehlo_status_line(struct selector_key *key, buffer * b) {
 
     return n;
 }
+
+static unsigned
+ehlo_write(struct selector_key *key) {
+    struct pop3 *p     =  ATTACHMENT(key);
+    struct ehlo_st *d = &p->origin.ehlo;
+
+    unsigned  ret     = EHLO;
+    buffer  *buffer   = d->rb;
+
+    ssize_t  n;
+
+    n = send_ehlo_status_line(key, buffer);
+
+    if (n == -1) {
+        ret = ERROR;
+    } 
+    else if (n == 0) {
+        selector_status ss = SELECTOR_SUCCESS;
+        ss |= selector_set_interest_key(key, OP_NOOP);
+        ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_READ);
+        ret = SELECTOR_SUCCESS == ss ? EHLO : ERROR;
+    } else {
+        selector_status ss = SELECTOR_SUCCESS;
+        ss |= selector_set_interest_key(key, OP_NOOP);
+        ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_WRITE);
+        ret = SELECTOR_SUCCESS == ss ? CAPA : ERROR;
+    }
+
+    return ret;
+}
+
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // REQUEST

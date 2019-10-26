@@ -1,4 +1,4 @@
-#define _POSIX_C_SOURCE 200809L
+//TODO: check POSIX version #define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
