@@ -3,6 +3,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <strings.h>
+#include <stdint.h>
 #include "include/pop3.h"
 #include "include/parser.h"
 #include "include/transformations.h"
@@ -13,8 +14,8 @@
  * @param fd        proxy-client file descriptor
  * @param command   buffer where the read command will be stored.
  */
-void read_command(int fd, char *command){
-    memset(command, 0, strlen(command));
+void read_command(int fd, uint8_t *command){
+    memset(command, 0, strlen((char*)command));
     if((recv(fd, command, 100, 0)) < 0){
         perror("Error reading comand from filedescriptor\n");
         exit(1);
@@ -22,7 +23,7 @@ void read_command(int fd, char *command){
 }
 
 
-void read_multiline_command(char buffer[], int start, int end, struct state_manager* state){
+void read_multiline_command(uint8_t buffer[], int start, int end, struct state_manager* state){
     int ended = FALSE;
 
     if(buffer[0] == '-'){
@@ -69,7 +70,7 @@ void read_multiline_command(char buffer[], int start, int end, struct state_mana
 
 void parse_response(uint8_t* buffer, struct state_manager* state) {
     if(state->is_single_line){
-        if(strcmp(buffer, "+OK Logging out\r\n") == 0 || strcmp(buffer, "+OK Logging out.\r\n") == 0) {
+        if(strcmp((char*)buffer, "+OK Logging out\r\n") == 0 || strcmp((char*)buffer, "+OK Logging out.\r\n") == 0) {
             state->state = DONE;
         }
         else{
@@ -81,15 +82,15 @@ void parse_response(uint8_t* buffer, struct state_manager* state) {
 
 }
 
-void transform_response(char* buffer, struct state_manager* state) {
+void transform_response(uint8_t* buffer, struct state_manager* state) {
     create_process(state);
     write_buffer(buffer, state->main_to_external_fds[1]);
     read_transformation(buffer, state->external_to_main_fds[0]);
 }
 
-void parse_command(char* buffer, struct state_manager* state) {
+void parse_command(uint8_t* buffer, struct state_manager* state) {
     char cmd[8], extra[64];
-    sscanf(buffer,"%s %s", cmd, extra);
+    sscanf((char*)buffer,"%s %s", cmd, extra);
 
     if (strcasecmp(cmd, "RETR") == 0 ||
         strcasecmp(cmd, "LIST") == 0 ||

@@ -91,7 +91,7 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
         return;
     }
 
-    char buffer[BUFFER_MAX_SIZE];
+    uint8_t buffer[BUFFER_MAX_SIZE];
    // struct buffer_t *expandable_buffer;
     //expandable_buffer = init_buffer();
 
@@ -100,14 +100,14 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
         switch(state->state) {
             case RESPONSE:
                 memset(buffer,0,BUFFER_MAX_SIZE);
-                read_from_server(server_fd, buffer);
+                read_from_server(server_fd, (char*)buffer);
                 parse_response(buffer,state);
                 write_response(fd, buffer, state); // TODO: Rename fd 3 client_fd
                 break;
             case REQUEST:
                 read_command(fd, buffer); 
                 parse_command(buffer, state);
-                write_to_server(server_fd, buffer, state);
+                write_to_server(server_fd, (char*)buffer, state);
                 break;
             case FILTER:
             /*

@@ -37,8 +37,8 @@ extern struct metrics_manager *metrics;
  * contención.
  */
 
-static const unsigned  max_pool  = 50; // tamaño máximo
-static unsigned        pool_size = 0;  // tamaño actual
+// static const unsigned  max_pool  = 50; // tamaño máximo
+// static unsigned        pool_size = 0;  // tamaño actual
 static struct pop3     *pool     = 0;  // pool propiamente dicho
 
 static const struct state_definition *
@@ -164,6 +164,10 @@ static const struct fd_handler pop3_handler = {
     .handle_close  = pop3_close,
     .handle_block  = pop3_block,
 };
+
+void pop3_destroy(struct pop3* state){
+    //Do Nothing
+}
 void pop3filter_passive_accept(){
     //https://stackoverflow.com/questions/16010622/reasoning-behind-c-sockets-sockaddr-and-sockaddr-storage
     struct sockaddr_storage       client_addr;
@@ -210,16 +214,13 @@ static void response_init(const unsigned state, struct selector_key *key){
 
 static unsigned response_read(struct selector_key *key){
     struct response_st *d = &(ATTACHMENT(key)->origin.response);
-    unsigned ret = RESPONSE;
+    //unsigned ret = RESPONSE;
     bool error = false;
-    uint8_t *ptr;
-    size_t count;
-    ssize_t n;
 
     struct state_manager *state; //TODO migrar con lo otro
-    count = read_from_server2(*(d->fd),d->rb, &error);
+    read_from_server2(*(d->fd),d->rb, &error);
     parse_response(d->rb->read, state);
-    write_response(d->fd, d->rb, state);
+    write_response(*(d->fd), d->rb->data, state); //TODO: Improve the method to work with new buffer
     
 
     return error? ERROR:state->state;
@@ -294,6 +295,7 @@ connection_resolve_blocking(void *data) {
 
     pthread_detach(pthread_self());
     p->origin_resolution = 0;
+    /*
     struct addrinfo hints = {
             .ai_family    = AF_UNSPEC,
             .ai_socktype  = SOCK_STREAM,
@@ -303,11 +305,11 @@ connection_resolve_blocking(void *data) {
             .ai_addr      = NULL,
             .ai_next      = NULL,
     };
-
+    */
     char buff[7];
     snprintf(buff, sizeof(buff), "%hu",options->origin_port);
 
-    getaddrinfo(options->proxy_address, buff, &hints, &p->origin_resolution);
+    //getaddrinfo(options->proxy_address, buff, &hints, &p->origin_resolution); TODO: FIX
 
     selector_notify_block(key->s, key->fd);
 
@@ -318,8 +320,7 @@ connection_resolve_blocking(void *data) {
 ///////      RESOLVE      ///////
 
 // Resolucion de nombre del origin server
-static unsigned
-connection_resolve(struct selector_key *key) {
+static unsigned connection_resolve(struct selector_key *key) {
     unsigned ret;
     pthread_t tid;
 
@@ -346,7 +347,7 @@ connection_resolve(struct selector_key *key) {
 static unsigned
 connection_resolve_complete(struct selector_key *key) {
     struct pop3       *pop =  ATTACHMENT(key);
-    unsigned           ret;
+    unsigned           ret = CONNECTING;
 
     if(pop->origin_resolution == NULL) {
         pop->error = "Couldn't resolve origin name server.";
@@ -394,7 +395,7 @@ connection_resolve_complete(struct selector_key *key) {
         goto error;
     }
 
-    return CONNECTING;
+    return ret;
 error:
     print_error(pop->error, get_time());
     return ERROR;
@@ -404,7 +405,6 @@ error:
 
 static unsigned connecting(struct selector_key *key) {
     struct pop3 *p = ATTACHMENT(key);
-    unsigned ret;
     int error;
     socklen_t len = sizeof(error);
     
@@ -635,7 +635,8 @@ static unsigned request_write(struct selector_key *key) {
     }
 
     if(ret == ERROR) {
-        print_error_message_with_client_ip(ATTACHMENT(key)->client_addr, "error writing client request to origin server");
+        //print_error_message_with_client_ip(ATTACHMENT(key)->client_addr, "error writing client request to origin server");
+        //TODO ERROR
     }
 
     return ret;
