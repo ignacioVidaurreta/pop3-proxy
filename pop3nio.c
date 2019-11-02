@@ -689,6 +689,11 @@ static const struct state_definition client_statbl[] = {
         .on_read_ready    = ehlo_read,
         .on_write_ready   = ehlo_write,
     },{
+        .state            = CAPA_STATE,
+        .on_arrival       = request_init,
+        .on_read_ready    = request_read,
+        .on_write_ready   = request_write,
+    },{
         .state            = REQUEST,
         .on_arrival       = request_init,
         .on_read_ready    = request_read,
@@ -698,12 +703,12 @@ static const struct state_definition client_statbl[] = {
         .on_arrival       = response_init,
         .on_read_ready    = response_read,
     },
-    // {
-    //     .state            = FILTER,
-    //     .on_arrival       = filter_init,
-    //     .on_write_ready   = filter_send,
-    //     .on_read_ready    = filter_recv,
-    // },
+    {
+        .state            = FILTER,
+/*         .on_arrival       = filter_init,
+        .on_write_ready   = filter_send,
+        .on_read_ready    = filter_recv, */
+    },
      {
         .state            = DONE,
     },{
