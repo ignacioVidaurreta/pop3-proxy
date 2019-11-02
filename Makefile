@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -pthread -std=c99 -pedantic -Wall -fsanitize=address
+CFLAGS = -pthread -std=c99 -pedantic -Wall -fsanitize=address -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE
 GREEN = \e[92m
 NORMAL = \e[0m
 FILES=./*.c
@@ -7,6 +7,11 @@ EXEC_NAME = run
 all: 
 	@echo "$(GREEN)Compiling ...$(NORMAL)"
 	$(CC) $(CFLAGS) $(FILES) -o $(EXEC_NAME)
+	@echo "$(GREEN)Done!$(NORMAL)"
+
+strict:
+	@echo "$(GREEN)Compiling in STRICT mode ...$(NORMAL)"
+	$(CC) $(CFLAGS) -Werror $(FILES) -o $(EXEC_NAME)
 	@echo "$(GREEN)Done!$(NORMAL)"
 
 debug:

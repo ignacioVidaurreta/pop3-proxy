@@ -124,7 +124,7 @@ void setCommand(char *cmd, char *newCmd)
 /**
  *  Parse command line arguments to update configuration.
  */
-void update_config(const int argc, char* const *argv){
+void update_config(const int argc, char* const* argv){
     int opt;
 
     while((opt = getopt(argc, argv, "p:P:o:c:vhe:l:L:m:M:t")) != -1){

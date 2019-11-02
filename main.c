@@ -30,7 +30,7 @@ sigterm_handler(const int signal) {
 }
 
 int
-main(const int argc, const char **argv) {
+main(const int argc, char* const* argv) {
      //Initialize configuration with default values
     initialize_config();
     init_metrics_manager();
@@ -106,7 +106,7 @@ main(const int argc, const char **argv) {
         goto finally;
     }
     const struct fd_handler pop3filter = {
-        .handle_read       = pop3filter_passive_accept, //TODO: necesitamos esto en el nio
+        .handle_read       = pop3filter_passive_accept, 
         .handle_write      = NULL,
         .handle_close      = NULL, // nada que liberar
     };
@@ -151,7 +151,7 @@ finally:
 
     selector_close();
 
-    pop3filter_pool_destroy();//TODO: also necesitamos esto en el nio
+    // TODO(@team): pop3filter_pool_destroy();
 
     if(server >= 0) {
         close(server);

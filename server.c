@@ -27,7 +27,7 @@ int read_from_server(int server_fd, char *response){
     return chars_read;
 }
 
-int read_from_server2(int server_fd, char *response, bool *error){
+int read_from_server2(int server_fd, buffer *response, bool *error){
     int chars_read;
     if((chars_read=recv(server_fd, response, BUFFER_MAX_SIZE, 0))<0){
         perror("Error recieving data from server\n");

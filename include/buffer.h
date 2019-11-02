@@ -3,7 +3,9 @@
 
 #include <stdbool.h>
 #include <unistd.h>  // size_t, ssize_t
+#include <stdint.h>
 
+#define BUFFER_MAX_SIZE 512
 /**
  * buffer.c - buffer con acceso directo (útil para I/O) que mantiene
  *            mantiene puntero de lectura y de escritura.

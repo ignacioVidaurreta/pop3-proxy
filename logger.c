@@ -12,7 +12,7 @@ char *get_level_string(enum level msg_level){
             return "[ INFO ]";
         case WARNING:
             return "[ WARNING ]";
-        case ERROR:
+        case FAILURE:
             return "[ ERROR ]";
         case DEBUG:
             return "[ DEBUG ]";
@@ -35,7 +35,7 @@ char *get_time(){
 
 
 int print_error(char* error_msg, char *timestamp){
-    logger(ERROR, error_msg, timestamp);
+    logger(FAILURE, error_msg, timestamp);
     return 0;
 }
 
@@ -46,7 +46,7 @@ void write_log(struct log_message* log){
         return;
     }
     char* color_modifier;
-    if(log->msg_level == ERROR){
+    if(log->msg_level == FAILURE){
         color_modifier = "\033[0;31m"; //RED
     }else if(log->msg_level == WARNING){
         color_modifier = "\033[0;33m"; //YELLOW

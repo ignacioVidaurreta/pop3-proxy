@@ -11,13 +11,13 @@
 #include "include/metrics.h"
 
 
-void write_response(int fd, char *response, struct state_manager* state){
+void write_response(int fd, uint8_t* response, struct state_manager* state){
     int n;
-    if((n = send(fd, response, strlen(response), 0)) < 0){
+    if((n = send(fd, response, strlen((char*)response), 0)) < 0){
         perror("Error sending data to client\n");
         return;
     }
-    if (!strstr(response, "+OK") && state->is_single_line){
+    if (!strstr((char*)response, "+OK") && state->is_single_line){
         logger(WARNING, "Origin returned error response. Awaiting next command from client.", get_time());
     }
     else {
@@ -25,13 +25,13 @@ void write_response(int fd, char *response, struct state_manager* state){
     }       
 }
 
-void write_response_from_buffer(int fd, struct buffer_t *buff){
-    int n;
-    if((n = send(fd, buff->buffer, buff->curr_length, 0))<0){
-        perror("Error sending data to client\n");
-        return;
-    }
-    else {
-        update_metrics_transfered_bytes(n);
-    }
-}
+// void write_response_from_buffer(int fd, buffer *buff){
+//     int n;
+//     if((n = send(fd, buff->buffer, buff->curr_length, 0))<0){
+//         perror("Error sending data to client\n");
+//         return;
+//     }
+//     else {
+//         update_metrics_transfered_bytes(n);
+//     }
+// }
