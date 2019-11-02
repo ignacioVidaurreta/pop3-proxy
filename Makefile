@@ -9,6 +9,11 @@ all:
 	$(CC) $(CFLAGS) $(FILES) -o $(EXEC_NAME)
 	@echo "$(GREEN)Done!$(NORMAL)"
 
+strict:
+	@echo "$(GREEN)Compiling in STRICT mode ...$(NORMAL)"
+	$(CC) $(CFLAGS) -Werror $(FILES) -o $(EXEC_NAME)
+	@echo "$(GREEN)Done!$(NORMAL)"
+
 debug:
 	@echo "$(GREEN)Compiling in debug mode ...$(NORMAL)"
 	$(CC) -g $(CFLAGS) $(FILES) -o $(EXEC_NAME)_debug
