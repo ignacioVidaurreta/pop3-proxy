@@ -677,11 +677,11 @@ void assign_cmd(struct selector_key *key, char *cmd, int cmds_read){
 static const struct state_definition client_statbl[] = {
     {
         .state            = RESOLVE,
-        .on_arrival       = connection_resolve,
+        .on_write_ready   = connection_resolve,
         .on_block_ready   = connection_resolve_complete,
     }, {
         .state            = CONNECTING,
-        .on_arrival       = connecting,
+        .on_write_ready       = connecting,
     }, {
         .state            = EHLO,
         .on_arrival       = ehlo_init,

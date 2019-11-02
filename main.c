@@ -106,7 +106,7 @@ main(const int argc, char* const* argv) {
         goto finally;
     }
     const struct fd_handler pop3filter = {
-        .handle_read       = pop3filter_passive_accept, //TODO: necesitamos esto en el nio
+        .handle_read       = pop3filter_passive_accept, 
         .handle_write      = NULL,
         .handle_close      = NULL, // nada que liberar
     };
