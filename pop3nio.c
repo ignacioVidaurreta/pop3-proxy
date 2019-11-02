@@ -66,7 +66,7 @@ pop3_new(int client_fd){
     ret->client_fd       = client_fd;
     ret->client_addr_len = sizeof(ret->client_addr);
 
-    ret->stm    .initial   = CONNECTING;
+    ret->stm    .initial   = RESOLVE;
     ret->stm    .max_state = ERROR;
     ret->stm    .states    = pop3_describe_states();
     stm_init(&ret->stm);
@@ -674,7 +674,6 @@ void assign_cmd(struct selector_key *key, char *cmd, int cmds_read){
 
 
 /** definición de handlers para cada estado */
-// TODO(@team): CAPA STATE
 static const struct state_definition client_statbl[] = {
     {
         .state            = RESOLVE,
