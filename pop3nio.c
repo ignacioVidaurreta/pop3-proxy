@@ -168,7 +168,7 @@ static const struct fd_handler pop3_handler = {
 void pop3_destroy(struct pop3* state){
     //Do Nothing
 }
-void pop3filter_passive_accept(){
+void pop3filter_passive_accept(struct selector_key* key){
     //https://stackoverflow.com/questions/16010622/reasoning-behind-c-sockets-sockaddr-and-sockaddr-storage
     struct sockaddr_storage       client_addr;
     socklen_t                     client_addr_len = sizeof(client_addr);
