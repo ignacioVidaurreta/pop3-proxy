@@ -18,7 +18,7 @@ void initialize_config(){
     options = malloc(sizeof(*options)); //TODO: free in right place
 
     options->local_port      = 1110;
-    options->origin_port     = 110;
+    options->origin_port     = 8080;
     options->management_port = 9090;
     
     options->replacement_message = (char *) calloc(250, sizeof(char));
@@ -132,6 +132,10 @@ in_port_t* expose_port(struct sockaddr* address){
         return 0;
 }
 
+
+void set_origin_server(char* address){
+    options->origin_server = address;
+}
 /**
  *  Parse command line arguments to update configuration.
  */
@@ -182,4 +186,13 @@ void update_config(const int argc, char* const* argv){
                 break;
         }
     }
+
+    /* TODO(NACHITO): Que esto funque
+    if (argv[optind] == NULL) {
+        print_usage(argv[0]);
+        exit(0);
+    }else
+        set_origin_server(argv[optind]);
+        */
+    set_origin_server("0.0.0.0");
 }
