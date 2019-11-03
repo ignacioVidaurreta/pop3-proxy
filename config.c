@@ -18,7 +18,7 @@ void initialize_config(){
     options = malloc(sizeof(*options)); //TODO: free in right place
 
     options->local_port      = 1110;
-    options->origin_port     = 8080;
+    options->origin_port     = 110;
     options->management_port = 9090;
     
     options->replacement_message = (char *) calloc(250, sizeof(char));
