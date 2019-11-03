@@ -182,7 +182,7 @@ void pop3filter_passive_accept(struct selector_key* key){
     if(selector_fd_set_nio(client) == -1) {
         goto fail;
     }
-    state = pop3_new(client); //Todo initialization of structure
+    state = pop3_new(client); //TODO initialization of structure
     if(state == NULL) {
         // sin un estado, nos es imposible manejaro.
         // tal vez deberiamos apagar accept() hasta que detectemos
@@ -194,7 +194,7 @@ void pop3filter_passive_accept(struct selector_key* key){
 
     //TODO create pop3_handler
     if(SELECTOR_SUCCESS != selector_register(key->s, client, &pop3_handler,
-                                            OP_READ, state)) {
+                                            OP_WRITE, state)) {
         goto fail;
     }
     return ;
@@ -672,16 +672,21 @@ void assign_cmd(struct selector_key *key, char *cmd, int cmds_read){
     }   
 }
 
+static void do_nothing(const unsigned state, struct selector_key *key){
+    //nothing to do
+}
+
 
 /** definición de handlers para cada estado */
 static const struct state_definition client_statbl[] = {
     {
-        .state            = RESOLVE,
+        .state            = RESOLVE,        
         .on_write_ready   = connection_resolve,
         .on_block_ready   = connection_resolve_complete,
     }, {
         .state            = CONNECTING,
-        .on_write_ready       = connecting,
+        .on_arrival       = do_nothing,
+        .on_write_ready   = connecting,
     }, {
         .state            = EHLO,
         .on_arrival       = ehlo_init,
