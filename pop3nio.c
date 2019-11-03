@@ -73,6 +73,8 @@ pop3_new(int client_fd){
 
     buffer_init(&ret->read_buffer,  N(ret->raw_buff_a), ret->raw_buff_a);
     buffer_init(&ret->write_buffer, N(ret->raw_buff_b), ret->raw_buff_b);
+    buffer_init(&ret->request_buffer, N(ret->raw_buff_c), ret->raw_buff_c);
+    buffer_init(&ret->cmd_request_buffer, N(ret->raw_buff_d), ret->raw_buff_d);
 
     //TODO: INCREMENTAR CANTIDAD DE CONEXIONES CONCURRENTES, 
     //TODAVIA NO TENEMOS LA STRUCT GLOBAL METRICS REFERENCIADA EN ESTE ARCHIVO
@@ -442,7 +444,7 @@ ehlo_init(const unsigned state, struct selector_key *key) {
     struct pop3     *p =  ATTACHMENT(key);
     struct ehlo_st *d = &p->origin.ehlo;
 
-    d->rb                              = &p->read_buffer;
+    d->rb                              = &p->read_buffer; //TODO: check if both buffers are necessary
     d->wb                              = &p->write_buffer;
 }
 
@@ -530,7 +532,8 @@ ehlo_write(struct selector_key *key) {
         selector_status ss = SELECTOR_SUCCESS;
         ss |= selector_set_interest_key(key, OP_NOOP);
         ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_WRITE);
-        ret = SELECTOR_SUCCESS == ss ? CAPA : ERROR;
+//        ret = SELECTOR_SUCCESS == ss ? CAPA : ERROR; TODO:implement CAPA STATE
+        ret = SELECTOR_SUCCESS == ss ? REQUEST : ERROR;
     }
 
     return ret;
@@ -572,6 +575,7 @@ static unsigned request_read(struct selector_key *key){
     }
 
     if(ret == ERROR) {
+        perror("que pasa aca loco");
         //print_error_with_address(ATTACHMENT(key)->client_addr, "Error reading client response"); TODO(Nachito)
     }
     return ret;
