@@ -17,10 +17,11 @@ struct config {
 
     // Target file to redirect stderr when executing a filter
     char* error_file;
+    char* origin_server;
 
     /* IP Addresses */
-    struct sockaddr_in proxy_address;
-    struct sockaddr_in managment_address;
+    struct sockaddr_storage proxy_address;
+    struct sockaddr_storage managment_address;
 
     /*  Message that is displayed when a part of the message is
      *  replaced because of a filter    
@@ -47,10 +48,11 @@ struct config {
 
 void initialize_config();
 void print_usage(char *cmd_name);
-int get_port_number(char* port);
+in_port_t get_port_number(char* port);
 void change_port(in_port_t *port, char *port_str);
 void change_error_file(char *filename);
 void replace_string(char *previous, char *new);
 void update_config(const int argc, char* const* argv);
+in_port_t* expose_port(struct sockaddr* address);
 
 #endif /* CONFIG_H */ 

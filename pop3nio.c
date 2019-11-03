@@ -295,7 +295,7 @@ connection_resolve_blocking(void *data) {
 
     pthread_detach(pthread_self());
     p->origin_resolution = 0;
-    /*
+
     struct addrinfo hints = {
             .ai_family    = AF_UNSPEC,
             .ai_socktype  = SOCK_STREAM,
@@ -305,11 +305,10 @@ connection_resolve_blocking(void *data) {
             .ai_addr      = NULL,
             .ai_next      = NULL,
     };
-    */
+
     char buff[7];
     snprintf(buff, sizeof(buff), "%hu",options->origin_port);
-
-    //getaddrinfo(options->proxy_address, buff, &hints, &p->origin_resolution); TODO: FIX
+    getaddrinfo(options->origin_server, buff, &hints, &p->origin_resolution);
 
     selector_notify_block(key->s, key->fd);
 

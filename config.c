@@ -4,6 +4,7 @@
 #include <limits.h>
 #include <errno.h>
 #include <getopt.h>
+#include <netinet/in.h>
 
 #include "include/config.h"
 #include "include/pop3.h"
@@ -28,9 +29,9 @@ void initialize_config(){
     options->parse_completely = FALSE;
 
     memset(&(options->proxy_address), 0, sizeof(options->proxy_address));
-    options->proxy_address.sin_family      = AF_INET;
-    options->proxy_address.sin_addr.s_addr = htonl(INADDR_ANY);
-    options->proxy_address.sin_port        = htons(options->local_port);
+    ((struct sockaddr_in*) &options->proxy_address)->sin_family      = AF_INET;
+    ((struct sockaddr_in*) &options->proxy_address)->sin_addr.s_addr = htonl(INADDR_ANY);
+    ((struct sockaddr_in*) &options->proxy_address)->sin_port        = htons(options->local_port);
 
     options->cmd = malloc(CAT_SIZE*sizeof(char));
     memcpy(options->cmd, "cat", CAT_SIZE);
@@ -61,7 +62,7 @@ void print_usage(char *cmd_name){
  *  Gets int value of the string port
  *  Code taken for Juan F. Codagnones' "SocksV5 Sockets Implementation"
  */
-int get_port_number(char* port){
+in_port_t get_port_number(char* port){
 
     char *end = 0;
     const long sl = strtol(port, &end, 10);
@@ -70,16 +71,16 @@ int get_port_number(char* port){
           || ((LONG_MIN == sl || LONG_MAX == sl) && ERANGE == errno)
           || sl < 0 || sl > USHRT_MAX) {
            fprintf(stderr, "port should be an integer: %s\n", port);
-           return -1;
+           return 0;
         }
-    return sl;
+    return (in_port_t)sl;
     
 
 }
 
 void change_port(in_port_t *port, char *port_str){
-    long port_num = get_port_number(port_str);
-    if (*port == -1 ) exit(1); // TODO(Nachito): Configure chain of returns
+    in_port_t port_num = get_port_number(port_str);
+    if (*port == 0 ) exit(1); // TODO(Nachito): Configure chain of returns
     *port = port_num;
 }
 
@@ -121,6 +122,16 @@ void setCommand(char *cmd, char *newCmd)
     memcpy(cmd, newCmd, strlen(newCmd));
 }
 
+in_port_t* expose_port(struct sockaddr* address){
+    if(address->sa_family == AF_INET)
+        return &((struct sockaddr_in*) address)->sin_port;
+    else if(address->sa_family == AF_INET6)
+        return &((struct sockaddr_in6*) address)->sin6_port;
+    else
+        //TODO Error handling
+        return 0;
+}
+
 /**
  *  Parse command line arguments to update configuration.
  */
@@ -131,7 +142,8 @@ void update_config(const int argc, char* const* argv){
         switch(opt){
             case 'p':
                 change_port(&options->local_port, optarg);
-                options->proxy_address.sin_port = htons(options->local_port);
+                in_port_t * port = expose_port((struct sockaddr*)&options->proxy_address);
+                *port = htons(options->local_port);
                 break;
             case 'P':
                 change_port(&options->origin_port, optarg);

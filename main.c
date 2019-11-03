@@ -29,8 +29,7 @@ sigterm_handler(const int signal) {
     done = true;
 }
 
-int
-main(const int argc, char* const* argv) {
+int main(const int argc, char* const* argv) {
      //Initialize configuration with default values
     initialize_config();
     init_metrics_manager();
@@ -44,9 +43,16 @@ main(const int argc, char* const* argv) {
     selector_status   ss      = SELECTOR_SUCCESS;
     fd_selector selector      = NULL;
 
-    //TODO: AF_INET puede ser IPv4 o IPv6
+    if (((struct sockaddr*)&options->proxy_address)->sa_family == AF_INET)
+        ((struct sockaddr_in*)&options->proxy_address)->sin_port = htons(options->local_port);
+    else if (((struct sockaddr*)&options->proxy_address)->sa_family == AF_INET6)
+        ((struct sockaddr_in6*)&options->proxy_address)->sin6_port = htons(options->local_port);
 
-    const int server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
+
+
+    const int server = socket(((struct sockaddr*)&options->proxy_address)->sa_family,
+            SOCK_STREAM, IPPROTO_TCP);
     if(server < 0) {
         err_msg = "unable to create socket";
         goto finally;
