@@ -73,6 +73,8 @@ pop3_new(int client_fd){
 
     buffer_init(&ret->read_buffer,  N(ret->raw_buff_a), ret->raw_buff_a);
     buffer_init(&ret->write_buffer, N(ret->raw_buff_b), ret->raw_buff_b);
+    buffer_init(&ret->request_buffer, N(ret->raw_buff_c), ret->raw_buff_c);
+    buffer_init(&ret->cmd_request_buffer, N(ret->raw_buff_d), ret->raw_buff_d);
 
     //TODO: INCREMENTAR CANTIDAD DE CONEXIONES CONCURRENTES, 
     //TODAVIA NO TENEMOS LA STRUCT GLOBAL METRICS REFERENCIADA EN ESTE ARCHIVO
@@ -172,7 +174,7 @@ void pop3filter_passive_accept(struct selector_key* key){
     //https://stackoverflow.com/questions/16010622/reasoning-behind-c-sockets-sockaddr-and-sockaddr-storage
     struct sockaddr_storage       client_addr;
     socklen_t                     client_addr_len = sizeof(client_addr);
-    struct pop3             *state           = NULL; //TODO structure
+    struct pop3             *state           = NULL;
 
     const int client = accept(key->fd, (struct sockaddr*) &client_addr,
                                                         &client_addr_len);
@@ -182,7 +184,7 @@ void pop3filter_passive_accept(struct selector_key* key){
     if(selector_fd_set_nio(client) == -1) {
         goto fail;
     }
-    state = pop3_new(client); //TODO initialization of structure
+    state = pop3_new(client);
     if(state == NULL) {
         // sin un estado, nos es imposible manejaro.
         // tal vez deberiamos apagar accept() hasta que detectemos
@@ -213,22 +215,109 @@ static void response_init(const unsigned state, struct selector_key *key){
 }
 
 static unsigned response_read(struct selector_key *key){
-    struct response_st *d = &(ATTACHMENT(key)->origin.response);
-    //unsigned ret = RESPONSE;
-    bool error = false;
+    struct response_st *d = &ATTACHMENT(key)->origin.response;
+    enum pop3_state ret      = RESPONSE;
 
-    struct state_manager *state; //TODO migrar con lo otro
-    read_from_server2(*(d->fd),d->rb, &error);
-    parse_response(d->rb->read, state);
-    write_response(*(d->fd), d->rb->data, state); //TODO: Improve the method to work with new buffer
-    
+    buffer  *b         = d->rb;
+    uint8_t *ptr;
+    size_t  count;
+    ssize_t  n;
 
-    return error? ERROR:state->state;
+    ptr = buffer_write_ptr(b, &count);
+    n = recv(key->fd, ptr, count, 0);
+
+    if(n > 0) {
+        //TODO: Multiline parse email (connect with old one)
+        buffer_write_adv(b, n);
+        selector_status ss = SELECTOR_SUCCESS;
+        ss |= selector_set_interest_key(key, OP_NOOP);
+        ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_WRITE);
+        ret = ss == SELECTOR_SUCCESS ? RESPONSE : ERROR;
+
+    } else {
+        ret = ERROR;
+    }
+
+    if(ret == ERROR) {
+        perror("Error reading file");
+        //print_error_message_with_client_ip(ATTACHMENT(key)->client_addr, "error reading response from origin server");
+    }
+
+    return ret;
+}
+static ssize_t
+send_to_server(struct selector_key *key, buffer * b) {
+    buffer *sb            = ATTACHMENT(key)->origin.response.wb;
+    uint8_t *sptr;
+
+    size_t count;
+    ssize_t n = 0;
+
+    size_t i = 0;
+
+    while (buffer_can_read(b) && n == 0) {
+        i++;
+        char c = buffer_read(b);
+        if (c == '\n') {
+            n = i;
+        }
+        buffer_write(sb, c);
+    }
+
+    if (n == 0) {
+        return 0;
+    }
+
+    sptr = buffer_read_ptr(sb, &count);
+
+    if (strncasecmp((char*)sptr, "+OK", 3) != 0) {
+        ATTACHMENT(key)->client.request.cmd_type = DEFAULT;
+    }
+
+    n = send(ATTACHMENT(key)->client_fd, sptr, count, MSG_NOSIGNAL);
+
+    buffer_reset(sb);
+
+    return n;
+}
+/** Escribe la respuesta en el cliente */
+static unsigned response_write(struct selector_key *key){
+    struct response_st *d = &ATTACHMENT(key)->origin.response;
+    enum pop3_state ret = RESPONSE;
+
+    buffer  *b = d->rb;
+    ssize_t  n;
+
+    n = send_to_server(key, b);
+
+    //TODO: QUIT
+    if (n == -1) {
+        ret = ERROR;
+    } else if (n == 0) {
+        selector_status ss = SELECTOR_SUCCESS;
+        ss |= selector_set_interest_key(key, OP_NOOP);
+        ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_READ);
+        ret = SELECTOR_SUCCESS == ss ? RESPONSE : ERROR;
+    }
+
+    selector_status ss = SELECTOR_SUCCESS;
+    ss |= selector_set_interest_key(key, OP_NOOP);
+    if (buffer_can_read(b)) {
+        ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_WRITE);
+        ret = ss == SELECTOR_SUCCESS ? RESPONSE : ERROR;
+    }
+    else {
+        ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_WRITE);
+        ret = SELECTOR_SUCCESS == ss ? REQUEST : ERROR;
+    }
+
+    return ret;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // Handlers top level de la conexión pasiva.
 // son los que emiten los eventos a la maquina de estados.
+///////////////////////////////////////////////////////////////////////////////
 static void pop3_done(struct selector_key* key);
 
 static void pop3_read(struct selector_key *key) {
@@ -295,7 +384,7 @@ connection_resolve_blocking(void *data) {
 
     pthread_detach(pthread_self());
     p->origin_resolution = 0;
-    /*
+
     struct addrinfo hints = {
             .ai_family    = AF_UNSPEC,
             .ai_socktype  = SOCK_STREAM,
@@ -305,11 +394,10 @@ connection_resolve_blocking(void *data) {
             .ai_addr      = NULL,
             .ai_next      = NULL,
     };
-    */
+
     char buff[7];
     snprintf(buff, sizeof(buff), "%hu",options->origin_port);
-
-    //getaddrinfo(options->proxy_address, buff, &hints, &p->origin_resolution); TODO: FIX
+    getaddrinfo(options->origin_server, buff, &hints, &p->origin_resolution);
 
     selector_notify_block(key->s, key->fd);
 
@@ -443,7 +531,7 @@ ehlo_init(const unsigned state, struct selector_key *key) {
     struct pop3     *p =  ATTACHMENT(key);
     struct ehlo_st *d = &p->origin.ehlo;
 
-    d->rb                              = &p->read_buffer;
+    d->rb                              = &p->read_buffer; //TODO: check if both buffers are necessary
     d->wb                              = &p->write_buffer;
 }
 
@@ -531,7 +619,8 @@ ehlo_write(struct selector_key *key) {
         selector_status ss = SELECTOR_SUCCESS;
         ss |= selector_set_interest_key(key, OP_NOOP);
         ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_WRITE);
-        ret = SELECTOR_SUCCESS == ss ? CAPA : ERROR;
+//        ret = SELECTOR_SUCCESS == ss ? CAPA : ERROR; TODO:implement CAPA STATE
+        ret = SELECTOR_SUCCESS == ss ? REQUEST : ERROR;
     }
 
     return ret;
@@ -573,6 +662,7 @@ static unsigned request_read(struct selector_key *key){
     }
 
     if(ret == ERROR) {
+        perror("que pasa aca loco");
         //print_error_with_address(ATTACHMENT(key)->client_addr, "Error reading client response"); TODO(Nachito)
     }
     return ret;
@@ -706,6 +796,7 @@ static const struct state_definition client_statbl[] = {
         .state            = RESPONSE,
         .on_arrival       = response_init,
         .on_read_ready    = response_read,
+        .on_write_ready   = response_write,
     },
     {
         .state            = FILTER,
