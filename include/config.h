@@ -21,7 +21,7 @@ struct config {
 
     /* IP Addresses */
     struct sockaddr_storage proxy_address;
-    struct sockaddr_storage managment_address;
+    struct sockaddr_storage management_address;
 
     /*  Message that is displayed when a part of the message is
      *  replaced because of a filter    

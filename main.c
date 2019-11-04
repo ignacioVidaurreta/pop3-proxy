@@ -17,6 +17,7 @@
 #include "include/logger.h"
 #include "include/metrics.h"
 #include "include/pop3nio.h"
+#include "include/management.h"
 #include "include/selector.h"
 
 static bool done = false;
@@ -48,26 +49,43 @@ int main(const int argc, char* const* argv) {
     else if (((struct sockaddr*)&options->proxy_address)->sa_family == AF_INET6)
         ((struct sockaddr_in6*)&options->proxy_address)->sin6_port = htons(options->local_port);
 
-
+    if (((struct sockaddr*)&options->management_address)->sa_family == AF_INET)
+        ((struct sockaddr_in*)&options->management_address)->sin_port = htons(options->management_port);
+    else if (((struct sockaddr*)&options->management_address)->sa_family == AF_INET6)
+        ((struct sockaddr_in6*)&options->management_address)->sin6_port = htons(options->management_port);
 
 
     const int server = socket(((struct sockaddr*)&options->proxy_address)->sa_family,
             SOCK_STREAM, IPPROTO_TCP);
+    const int management_server = socket(((struct sockaddr*)&options->management_address)->sa_family, 
+            SOCK_STREAM, IPPROTO_SCTP);
+
     if(server < 0) {
-        err_msg = "unable to create socket";
+        err_msg = "Unable to create server socket :(";
+        goto finally;
+    }
+
+    if (management_server < 0){
+        err_msg = "Unable to create management socket :(";
         goto finally;
     }
 
     // man 7 ip. no importa reportar nada si falla.
     setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
+	setsockopt(management_server, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
 
     if(bind(server, (struct sockaddr*)&options->proxy_address, sizeof(options->proxy_address)) < 0){
-        err_msg = "unable to bind socket";
+        err_msg = "Unable to bind server socket :(";
+        goto finally;
+    }
+
+    if(bind(management_server, (struct sockaddr*)&(options->management_address), sizeof(options->management_address)) < 0){
+        err_msg = "Unable to bind management socket :(";
         goto finally;
     }
 
 /*    
-    NO SE QUE ES LEL
+    TODO: NO SE QUE ES LEL
 
     struct sctp_initmsg initmsg;
   	memset(&initmsg, 0, sizeof(initmsg));
@@ -77,19 +95,29 @@ int main(const int argc, char* const* argv) {
   	setsockopt(managementServer, IPPROTO_SCTP, SCTP_INITMSG, &initmsg, sizeof(initmsg)); */
 
     if(listen(server,20) < 0){
-        err_msg = "unable to listen";
+        err_msg = "Unable to listen on server :(";
+        goto finally;
+    }
+
+    if (listen(management_server, 20)){
+        err_msg = "Unable to listen on management server :(";
         goto finally;
     }
 
     log_port("Listening on TCP port", options->local_port);
 
-    // registrar sigterm es útil para terminar el programa normalmente.
-    // esto ayuda mucho en herramientas como valgrind.
+    // Registrar sigterm es útil para terminar el programa normalmente.
+    // Esto ayuda mucho en herramientas como valgrind.
     signal(SIGTERM, sigterm_handler);
     signal(SIGINT,  sigterm_handler);
 
     if(selector_fd_set_nio(server) == -1) {
-        err_msg = "getting server socket flags";
+        err_msg = "Getting server socket flags";
+        goto finally;
+    }
+
+    if(selector_fd_set_nio(management_server) == -1) {
+        err_msg = "Getting management server socket flags";
         goto finally;
     }
 
@@ -117,10 +145,18 @@ int main(const int argc, char* const* argv) {
         .handle_close      = NULL, // nada que liberar
     };
 
+    const struct fd_handler management = {
+        .handle_read       = management_passive_accept,
+        .handle_write      = NULL,
+        .handle_close      = NULL, // nada que liberar
+    };
+    
+
     ss = selector_register(selector, server, &pop3filter, OP_READ, NULL);
+    ss = selector_register(selector, management_server, &management, OP_READ, NULL);
 
     if(ss != SELECTOR_SUCCESS) {
-        err_msg = "registering fd";
+        err_msg = "Registering fd";
         goto finally;
     }
 

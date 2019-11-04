@@ -29,9 +29,15 @@ void initialize_config(){
     options->parse_completely = FALSE;
 
     memset(&(options->proxy_address), 0, sizeof(options->proxy_address));
+    memset(&(options->management_address), 0, sizeof(options->management_address));
+
     ((struct sockaddr_in*) &options->proxy_address)->sin_family      = AF_INET;
     ((struct sockaddr_in*) &options->proxy_address)->sin_addr.s_addr = htonl(INADDR_ANY);
     ((struct sockaddr_in*) &options->proxy_address)->sin_port        = htons(options->local_port);
+
+    ((struct sockaddr_in*) &options->management_address)->sin_family      = AF_INET;
+	((struct sockaddr_in*) &options->management_address)->sin_addr.s_addr = htonl(INADDR_ANY);
+    ((struct sockaddr_in*) &options->management_address)->sin_port        = htons(options->local_port);
 
     options->cmd = malloc(CAT_SIZE*sizeof(char));
     memcpy(options->cmd, "cat", CAT_SIZE);
