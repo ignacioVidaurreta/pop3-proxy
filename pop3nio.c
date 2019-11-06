@@ -194,7 +194,6 @@ void pop3filter_passive_accept(struct selector_key* key){
     memcpy(&state->client_addr, &client_addr, client_addr_len);
     state->client_addr_len = client_addr_len;
 
-    //TODO create pop3_handler
     if(SELECTOR_SUCCESS != selector_register(key->s, client, &pop3_handler,
                                             OP_WRITE, state)) {
         goto fail;
@@ -522,17 +521,14 @@ static unsigned connecting(struct selector_key *key) {
 
 
 
-////////////////////////////////////////////////////////////////////////////////
-// EHLO
-////////////////////////////////////////////////////////////////////////////////
+///////      EHLO      ///////
 
 static void
 ehlo_init(const unsigned state, struct selector_key *key) {
-    struct pop3     *p =  ATTACHMENT(key);
-    struct ehlo_st *d = &p->origin.ehlo;
-
-    d->rb                              = &p->read_buffer; //TODO: check if both buffers are necessary
-    d->wb                              = &p->write_buffer;
+    struct pop3     *p  =  ATTACHMENT(key);
+    struct ehlo_st *d   = &p->origin.ehlo;
+    d->rb               = &p->read_buffer;
+    d->wb               = &p->write_buffer;
 }
 
 static unsigned
@@ -566,16 +562,21 @@ ehlo_read(struct selector_key *key) {
 static ssize_t
 send_ehlo_status_line(struct selector_key *key, buffer * b) {
     buffer *wb = ATTACHMENT(key)->origin.ehlo.wb;
-    uint8_t *rptr;
+    uint8_t *read_ptr;
 
     size_t count;
     ssize_t n = 0;
 
     size_t i = 0;
 
+
+    /* Parse hello message */
     while (buffer_can_read(b) && n == 0) {
         i++;
         char c = buffer_read(b);
+        if( c != '+' && i ==0 ) {
+            return -1;
+        }
         if (c == '\n') {
             n = i;
         }
@@ -586,9 +587,9 @@ send_ehlo_status_line(struct selector_key *key, buffer * b) {
         return 0;
     }
 
-    rptr = buffer_read_ptr(wb, &count);
+    read_ptr = buffer_read_ptr(wb, &count);
 
-    n = send(ATTACHMENT(key)->client_fd, rptr, count, MSG_NOSIGNAL);
+    n = send(ATTACHMENT(key)->client_fd, read_ptr, count, MSG_NOSIGNAL);
 
     buffer_reset(wb);
 
@@ -628,9 +629,8 @@ ehlo_write(struct selector_key *key) {
 
 
 
-////////////////////////////////////////////////////////////////////////////////
-// REQUEST
-////////////////////////////////////////////////////////////////////////////////
+///////      REQUEST      ///////
+
 /** inicializa las variables del estado REQUEST */
 static void request_init(const unsigned state, struct selector_key *key) {
     struct request_st * d = &ATTACHMENT(key)->client.request;
@@ -662,7 +662,6 @@ static unsigned request_read(struct selector_key *key){
     }
 
     if(ret == ERROR) {
-        perror("que pasa aca loco");
         //print_error_with_address(ATTACHMENT(key)->client_addr, "Error reading client response"); TODO(Nachito)
     }
     return ret;

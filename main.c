@@ -72,7 +72,7 @@ int main(const int argc, char* const* argv) {
 
     // man 7 ip. no importa reportar nada si falla.
     setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
-	setsockopt(management_server, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
+    setsockopt(management_server, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
 
     if(bind(server, (struct sockaddr*)&options->proxy_address, sizeof(options->proxy_address)) < 0){
         err_msg = "Unable to bind server socket :(";
@@ -83,16 +83,6 @@ int main(const int argc, char* const* argv) {
         err_msg = "Unable to bind management socket :(";
         goto finally;
     }
-
-/*    
-    TODO: NO SE QUE ES LEL
-
-    struct sctp_initmsg initmsg;
-  	memset(&initmsg, 0, sizeof(initmsg));
- 	initmsg.sinit_num_ostreams = 1;
-  	initmsg.sinit_max_instreams = 1;
-  	initmsg.sinit_max_attempts = 4;
-  	setsockopt(managementServer, IPPROTO_SCTP, SCTP_INITMSG, &initmsg, sizeof(initmsg)); */
 
     if(listen(server,20) < 0){
         err_msg = "Unable to listen on server :(";
