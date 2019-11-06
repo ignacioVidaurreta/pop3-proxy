@@ -2,6 +2,7 @@
 #define POP3__H
 
     #include "buffer.h"
+    #include "pop3nio.h"
     extern struct config* options;
     
     int clean_up(int fd, int originFd, int failed);
@@ -12,16 +13,16 @@
     #define TRUE 1
     #define FALSE 0
 
-    enum POP3_STATE {
-        RESPONSE = 0,
-        REQUEST = 1,
-        FILTER = 2,
-        END = 3,
-    };
+    // enum POP3_STATE {
+    //     RESPONSE = 0,
+    //     REQUEST = 1,
+    //     FILTER = 2,
+    //     END = 3,
+    // };
 
 
     struct state_manager {
-        enum POP3_STATE state;
+        enum pop3_state state;
         int is_single_line;
         int found_CR;
         int found_LF;

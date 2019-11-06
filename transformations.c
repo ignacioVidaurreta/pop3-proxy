@@ -1,4 +1,4 @@
-#define _POSIX_C_SOURCE 200809L
+//TODO: check POSIX version #define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -39,13 +39,13 @@ void create_process(struct state_manager* state) {
     }
 }
 
-void write_buffer(char* buffer, int write_fd){
-    if(dprintf(write_fd, buffer) < 0)
+void write_buffer(uint8_t* buffer, int write_fd){
+    if(dprintf(write_fd, (char*)buffer) < 0)
         print_error("Error writing to fd", get_time());
 }
 
-void read_transformation(char* buffer, int read_fd) {
-    if(read(read_fd, buffer, strlen(buffer)) < 0)
+void read_transformation(uint8_t* buffer, int read_fd) {
+    if(read(read_fd, buffer, strlen((char*)buffer)) < 0)
         print_error("Error reading from fd", get_time());
 }
 

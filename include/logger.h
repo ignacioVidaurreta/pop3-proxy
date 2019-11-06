@@ -5,7 +5,7 @@
 #include <arpa/inet.h>
 
 
-enum level {INFO, DEBUG, WARNING, ERROR, METRICS};
+enum level {INFO, DEBUG, WARNING, FAILURE, METRICS};
 
 struct log_message {
     enum level msg_level;
