@@ -8,12 +8,13 @@
 #include <netdb.h>
 #include <netinet/sctp.h>
 #include <sys/types.h>
-#include <sys/socket.h>
+
 
 #include "include/buffer.h"
 #include "include/stm.h"
 #include "include/management.h"
 #include "include/selector.h"
+#include "include/management_cmd_parser.h"
 
 /*
 1     Byte = Command: 0=USER
@@ -30,7 +31,7 @@
 
 enum management_state {
   READING_USER,
-  CONFIRM_USER,
+  WRITING_USER,
   READING_PASS,
   CONFIRM_PASS,
   WAITING_COMMAND,
@@ -47,13 +48,12 @@ struct management {
 
     /** resolución de la dirección del origin server */
     struct addrinfo              *origin_resolution;
-    /** maquinas de estados */
-    struct state_machine          stm;
 
-    /** Parser */
-    // struct spcp_request_parser parser;
+    struct state_machine          stm;
+    struct request_parser parser;
+
     /** El resumen de la respuesta a enviar */
-    // enum spcp_response_status status;
+    enum response_status status;
 
     /** buffers para ser usados read_buffer, write_buffer.*/
     uint8_t raw_buff_a[2048], raw_buff_b[2048];
@@ -203,27 +203,38 @@ static void management_done(struct selector_key* key) {
 
 ///////      USER VALIDATION      ///////
 
-static void
-user_read_init(const unsigned state, struct selector_key *key) {
+static void user_read_init(const unsigned state, struct selector_key *key) {
     struct management *management = ATTACHMENT(key);
+    parser_init(&management->parser);
+
 }
 
-static unsigned
-user_read(struct selector_key *key) {
+static unsigned user_read(struct selector_key *key) {
     struct management *management = ATTACHMENT(key);
 
     buffer *read_buffer     = &management->read_buffer;
     unsigned  ret   = READING_USER;
     bool  error = false;
 
+    uint8_t *ptr;
+    size_t  count;
+    ssize_t  n;
+
+    ptr = buffer_write_ptr(read_buffer, &count);
+    n = recv(key->fd, ptr, count, 0);
+    if(n > 0) {
+        buffer_write_adv(read_buffer, n);
+        int state = parse_input(read_buffer, &management->parser, &error);
+    } else {
+        ret = ERROR;
+    }
 
     return error ? ERROR : ret;
 }
 
-static unsigned
-user_process(struct selector_key *key) {
+static unsigned user_process(struct selector_key *key) {
     struct management *management = ATTACHMENT(key);
-    unsigned ret = CONFIRM_USER;
+    unsigned ret = WRITING_USER;
 
     return ret;
 }
@@ -232,9 +243,25 @@ static unsigned
 user_confirm(struct selector_key *key) {
     struct management *management = ATTACHMENT(key);
 
-    unsigned  ret     = CONFIRM_USER;
+    unsigned  ret     = WRITING_USER;
     struct buffer *wb = &management->write_buffer;
 
+    uint8_t *ptr;
+    size_t  count;
+    ssize_t  n;
+
+    ptr = buffer_read_ptr(wb, &count);
+    n = send(key->fd, ptr, count, 0);
+    if(n == -1) {
+        ret = ERROR;
+    } else {
+        buffer_read_adv(wb, n);
+        if(!buffer_can_read(wb)) {
+            if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_READ)) {
+                //do nothing
+            }
+        }
+    }
 
     return ret;
 }
@@ -286,14 +313,15 @@ command_init(const unsigned state, struct selector_key *key){
 static unsigned
 command_read(struct selector_key *key){
     unsigned  ret     = RESPOND_COMMAND;
+    //perror("Hello World");
 
     return ret;
 }
 
 static unsigned
 command_respond(struct selector_key *key){
-  unsigned  ret     = WAITING_COMMAND;
-
+    unsigned  ret     = WAITING_COMMAND;
+    perror("Bye world");
     return ret;
 }
 /** definición de handlers para cada estado */
@@ -303,7 +331,7 @@ static const struct state_definition client_statbl[] = {
         .on_arrival       = user_read_init,
         .on_read_ready    = user_read,
     }, {
-        .state            = CONFIRM_USER,
+        .state            = WRITING_USER,
         .on_write_ready   = user_confirm,
     }, {
         .state            = READING_PASS,
