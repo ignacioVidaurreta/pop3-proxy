@@ -67,51 +67,25 @@ struct ctx {
     struct parser* boundary_key;
     /* detector de boundary border */
     struct parser* boundary_border;
-    /* detector del final de boundary border.
-     * Diferencia si es un border comun, un 
-     * final de boundary o si no es valido
-     */
+
     struct parser* boundary_border_end;
 
-    /* ¿hemos detectado si el field-name que estamos procesando refiere
-     * a Content-Type?. Utilizando dentro msg para los field-name.
-     */
     bool *msg_content_type_field_detected;
-    /* ¿hemos terminado de guardar el value del 
-     * content-type?
-     */
+
     bool *msg_content_type_value_stored;
-    /* ¿hemos detectado dentro del Content-Type en el que estamos
-     * a "boundary="?
-     */
+
     bool *msg_boundary_name_detected;
-    /* ¿hemos terminado de guardar el value del 
-     * boundary?
-     */
+
     bool *msg_boundary_key_stored;
-    /* ¿hemos detectado el boundary border?
-     */
     bool *msg_boundary_border_detected;
-    /* ¿es un mime a filtrar el valor actual?
-     */
     bool *filter_curr_mime;
-    /* ¿es un multipart el mime actual?
-     */
     bool *multipart_curr_mime;
-    /* ¿es un message/rfc822 el mime actual?
-     */
     bool *message_curr_mime;
-    /* content-type actual */
     char *content_type;
-    /* stack de boundaries */
     char **boundaries;
-    /* cantidad de boundaries */
     int boundaries_n;
-    /* mensaje de reemplazo */
-    char *filter_msg;
-
+    char *replacement_text;
     char *blocked_type;
-
     bool *output_enabled;
 };
 
@@ -458,7 +432,7 @@ mime_msg(struct ctx *ctx, const uint8_t c) {
                     if(*ctx->multipart_curr_mime) {
                         printf("--%s\r\n", ctx->boundaries[ctx->boundaries_n-1]);
                     }
-                    printf("%s\r\n", ctx->filter_msg);
+                    printf("%s\r\n", ctx->replacement_text);
                     if(!*ctx->multipart_curr_mime) {
                         printf("--%s", ctx->boundaries[ctx->boundaries_n-1]);                    
                     }
@@ -556,7 +530,8 @@ main(const int argc, const char **argv) {
 
 
         .content_type           = calloc(1024, sizeof(char)),
-        .blocked_type           = "application/octet-stream",
+        .blocked_type           = "text/html",
+        .replacement_text       = "[[This content has been blocked due to security reasons.]]",
         .boundaries             = calloc(1024, sizeof(char *)),
         .boundaries_n           = 0,
         .output_enabled         = &T,
