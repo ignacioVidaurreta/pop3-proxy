@@ -14,7 +14,7 @@ void init_metrics_manager() {
 
 char * get_metrics() {
     char* aux = malloc(256*sizeof(char));
-    sprintf(aux,"Current metrics\n > concurrent_connections: %d\n > number_of_connections: %d\n > transfered_bytes: %d",metrics->concurrent_connections,
+    sprintf(aux,"Current metrics\n > concurrent_connections: %d\n > number_of_connections: %d\n > transfered_bytes: %ld",metrics->concurrent_connections,
     metrics->number_of_connections, metrics->transfered_bytes);
     return aux;
 }

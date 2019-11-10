@@ -32,7 +32,7 @@ void print_error_msg(uint8_t error_code){
     }
 }
 bool handle_user(char *user, int connSock) {
-    uint8_t command = 0, nargs = 1;
+    uint8_t command = 0x00, nargs = 1;
     int ret;
     uint8_t datagram[MAX_DATAGRAM_SIZE];
     uint8_t response[MAX_DATAGRAM_SIZE];
@@ -55,7 +55,7 @@ bool handle_user(char *user, int connSock) {
 }
 
 bool handle_password(char * password, int conn_sock){
-    uint8_t command = 1, nargs = 1;
+    uint8_t command = 0x01, nargs = 1;
     int ret;
     uint8_t datagram[MAX_DATAGRAM_SIZE];
     uint8_t response[MAX_DATAGRAM_SIZE];
@@ -84,8 +84,7 @@ void print_commands(){
     printf("> 'bytes' To get number of transferred bytes\n");
 }
 
-void get_concurrent_connections(int conn_sock){
-    uint8_t command = 0x02, nargs = 0;
+void send_msg_no_arguments(int conn_sock, char* fmt, uint8_t command, uint8_t nargs){
     int ret;
     uint8_t datagram[MAX_DATAGRAM_SIZE];
     uint8_t response[MAX_DATAGRAM_SIZE];
@@ -99,32 +98,20 @@ void get_concurrent_connections(int conn_sock){
         char data[response[1] + 1];
         memcpy(data, response + 2, response[1]);
         data[response[1]] = '\0';
-        printf("Concurrent connections: %s \n", data);
+        printf(fmt, data);
     } else {
         print_error_msg(response[0]);
     }
-    return 1;
+}
+
+void get_concurrent_connections(int conn_sock){
+    char* format_msg = "Concurrent connections: %s \n";
+    uint8_t command = 0x02, nargs = 0;
+    send_msg_no_arguments(conn_sock, format_msg, command, nargs);
 }
 
 void get_transferred_bytes(int conn_sock){
+    char* format_msg = "Bytes transferred: %s \n";
     uint8_t command = 0x05, nargs = 0;
-    int ret;
-    uint8_t datagram[MAX_DATAGRAM_SIZE];
-    uint8_t response[MAX_DATAGRAM_SIZE];
-    datagram[0] = command;
-    datagram[1] = nargs;
-
-    ret = sctp_sendmsg(conn_sock, (const void *) datagram, 2,
-                       NULL, 0, 0, 0, STREAM, 0, 0);
-    ret = sctp_recvmsg(conn_sock, (void *) response, MAX_DATAGRAM_SIZE,
-                       (struct sockaddr *) NULL, 0, 0, 0);
-
-    if(response[0] == 0){
-        char data[response[1] + 1];
-        memcpy(data, response+2, response[1]);
-        data[response[1]] = '\0';
-        printf("Bytes transferred: %s \n", data);
-    }else{
-        print_error_msg(response[0]);
-    }
+    send_msg_no_arguments(conn_sock, format_msg, command, nargs);
 }
