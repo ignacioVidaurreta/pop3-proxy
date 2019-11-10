@@ -302,7 +302,9 @@ static unsigned response_write(struct selector_key *key){
 
     selector_status ss = SELECTOR_SUCCESS;
     ss |= selector_set_interest_key(key, OP_NOOP);
-    if (buffer_can_read(b)) {
+    if(strcmp((char*)d->wb->limit, "quit\n") == 0){
+        return DONE;
+    }else if (buffer_can_read(b)) {
         ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_WRITE);
         ret = ss == SELECTOR_SUCCESS ? RESPONSE : ERROR;
     }
