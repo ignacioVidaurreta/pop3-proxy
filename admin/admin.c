@@ -142,12 +142,6 @@ int main(int argc, char* const* argv){
     printf("\t\tPlease login\t\t\n");
     int ended = 0;
     while(!ended){
-        do{
-            printf("Write 'login' to login \n");
-            if(fgets(buffer, sizeof(buffer), stdin) == NULL)
-                fprintf(stderr, "There was an error when reading the input\n");
-                buffer[strcspn(buffer, "\n")] = 0; //Remove last \n
-        }while(strcmp(buffer, "login") != 0);
         bool user_logged = false;
         bool reading_username = true;
         bool reading_password = true;
@@ -168,10 +162,14 @@ int main(int argc, char* const* argv){
             while(reading_password){
                 memset(buffer, 0, sizeof(buffer));
                 if(fgets(buffer, sizeof(buffer), stdin) != NULL){
-                    if(is_valid_password(buffer))
+                    success = handle_password(buffer, conn_sock);
+                    if(success){
                         reading_password = false;
-                    else
+                        printf("Logged In successfully!");
+                    }
+                    else{
                         printf("Invalid password! Please try again\n");
+                    }
                 }
             }
             user_logged = true;

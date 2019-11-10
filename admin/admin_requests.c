@@ -37,3 +37,22 @@ bool handle_user(char *user, int connSock) {
     }
     return true;
 }
+
+bool handle_password(char * password, int conn_sock){
+    uint8_t command = 1, nargs = 1;
+    int ret;
+    uint8_t datagram[MAX_DATAGRAM_SIZE];
+    uint8_t res[MAX_DATAGRAM_SIZE];
+
+    datagram[0] = command;
+    datagram[1] = nargs;
+    size_t length = strlen(password);
+    datagram[2] = length;
+    memcpy(datagram + 3, password, length);
+    ret = sctp_sendmsg(conn_sock, (const void *) datagram, 3 + length,
+                       NULL, 0, 0, 0, STREAM, 0, 0);
+    ret = sctp_recvmsg(conn_sock, (void *) res, MAX_DATAGRAM_SIZE,
+                       (struct sockaddr *) NULL, 0, 0, 0);
+    
+    return res[0] == 0;
+}
