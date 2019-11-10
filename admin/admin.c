@@ -139,6 +139,7 @@ int main(int argc, char* const* argv){
 
     if(ret < 0 ){
         fprintf(stderr, "Couldn't connect to server. Is the server running?\n");
+        free(addr);
         exit(0);
     }
 
