@@ -29,6 +29,9 @@
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 #define ATTACHMENT(key) ( (struct management *)(key)->data)
 
+struct sctp_sndrcvinfo sndrcvinfo;
+int sctp_flags;
+
 enum management_state {
   READING_USER,
   WRITING_USER,
@@ -209,6 +212,14 @@ static void user_read_init(const unsigned state, struct selector_key *key) {
 
 }
 
+bool request_is_done(int state, bool* error ){
+    if(state >= READING_ERROR && error != 0){
+        *error = true;
+    }
+
+    return state >= READING_DONE;
+}
+
 static unsigned user_read(struct selector_key *key) {
     struct management *management = ATTACHMENT(key);
 
@@ -221,10 +232,13 @@ static unsigned user_read(struct selector_key *key) {
     ssize_t  n;
 
     ptr = buffer_write_ptr(read_buffer, &count);
-    n = recv(key->fd, ptr, count, 0);
+    n = sctp_recvmsg(key->fd, ptr, count, 0, 0, &sndrcvinfo, &sctp_flags);
     if(n > 0) {
         buffer_write_adv(read_buffer, n);
         int state = parse_input(read_buffer, &management->parser, &error);
+        if(request_is_done(state, 0)){
+            ret = user_process(key);
+        }
     } else {
         ret = ERROR;
     }
@@ -236,14 +250,40 @@ static unsigned user_process(struct selector_key *key) {
     struct management *management = ATTACHMENT(key);
     unsigned ret = WRITING_USER;
 
+    struct spcp_request *request = &management->parser.request;
+    if(management->username == NULL)
+        management->username = malloc(management->parser.request.arg0_size + 1);
+    else
+        management->username = realloc(management->username, management->parser.request.arg0_size +1);
+    if(management->username == NULL){
+        management->status = READING_ERROR;
+        return ERROR;
+    }
+
+    memcpy(management->username, management->parser.request.arg0, management->parser.request.arg0_size);
+    management->username[management->parser.request.arg0_size] = '\0';
+
+    if(strcmp(management->username, "admin\n") == 0) {
+        management->status = CMD_SUCCESS;
+        if (write_response_no_args(&management->write_buffer, 0x00) == -1) {
+            ret = ERROR;
+        }
+    } else {
+        management->status = AUTH_ERROR;
+        if (write_response_no_args(&management->write_buffer, 0x01) == -1) {
+            ret = ERROR;
+        }
+    }
+    if(SELECTOR_SUCCESS != selector_set_interest_key(key, OP_WRITE)) {
+        return ERROR;
+    }
     return ret;
 }
 
-static unsigned
-user_confirm(struct selector_key *key) {
+static unsigned user_confirm(struct selector_key *key) {
     struct management *management = ATTACHMENT(key);
 
-    unsigned  ret     = WRITING_USER;
+    unsigned  ret     = READING_PASS;
     struct buffer *wb = &management->write_buffer;
 
     uint8_t *ptr;
@@ -251,15 +291,21 @@ user_confirm(struct selector_key *key) {
     ssize_t  n;
 
     ptr = buffer_read_ptr(wb, &count);
-    n = send(key->fd, ptr, count, 0);
+    n = sctp_sendmsg(key->fd, ptr, count, NULL, 0, 0, 0, 0,0,0);
     if(n == -1) {
         ret = ERROR;
     } else {
         buffer_read_adv(wb, n);
         if(!buffer_can_read(wb)) {
             if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_READ)) {
-                //do nothing
-            }
+                if(management->status == CMD_SUCCESS)
+                    ret = READING_PASS;
+                else if(management->status == AUTH_ERROR)
+                    ret = READING_USER;
+                else
+                    ret = ERROR;
+            }else
+                ret = ERROR;
         }
     }
 

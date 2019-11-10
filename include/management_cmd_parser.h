@@ -75,4 +75,6 @@ void set_argument_size(struct request_parser * parser, uint8_t c);
 
 enum parser_state parse_argument(struct request_parser * parser, uint8_t arg);
 
+int write_response_no_args(buffer *b, uint8_t status);
+
 #endif //PC_2019B_01_MANAGEMENT_CMD_PARSER_H

@@ -1,12 +1,12 @@
 CC = gcc
-CFLAGS = -pthread -std=c99 -pedantic -Wall -fsanitize=address -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE
+CFLAGS = -pthread -std=c99 -pedantic -Wall -fsanitize=address -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE  
 GREEN = \e[92m
 NORMAL = \e[0m
 FILES=./*.c
 EXEC_NAME = run
 all: 
 	@echo "$(GREEN)Compiling ...$(NORMAL)"
-	$(CC) $(CFLAGS) $(FILES) -o $(EXEC_NAME)
+	$(CC) $(CFLAGS) $(FILES) -o $(EXEC_NAME) -lsctp
 	@echo "$(GREEN)Done!$(NORMAL)"
 
 strict:

@@ -5,7 +5,7 @@
 #include "include/buffer.h"
 
 bool arguments_left_to_read(struct request_parser * parser){
-    return parser->nargs_i >= parser->nargs;
+    return parser->nargs_i < parser->nargs;
 }
 
 bool finished_parsing(struct request_parser * parser){
@@ -29,6 +29,8 @@ enum parser_state parse_argument(struct request_parser * parser, uint8_t arg){
 
         return READING_DONE;
     }
+
+    return READING_ARGS;
 }
 void parser_init(struct request_parser * parser){
     parser -> state = READING_CMD;
@@ -72,7 +74,7 @@ enum parser_state parse_arguments_number(struct request_parser * parser, uint8_t
 }
 
 enum parser_state parse_cmd(struct request_parser * parser, const uint8_t c){
-    if( c <= 0x04 ){
+    if( c <= (uint8_t)0x04 ){
         parser->request.cmd = c;
         return READING_ARGS_NUM;
     }
@@ -112,8 +114,27 @@ enum parser_state parser_feed(struct request_parser * parser, const uint8_t c){
 enum parser_state parse_input(buffer* buffer, struct request_parser* parser, bool* error_flag){
     enum parser_state state = parser->state;
 
-    while(buffer_can_read(buffer)){
+    while(buffer_can_read(buffer) && state < READING_DONE){
         const uint8_t c = buffer_read(buffer);
         state = parser_feed(parser, c);
     }
+    return state;
+}
+
+int write_response_no_args(buffer *b, uint8_t status){
+    size_t n;
+    uint8_t *buff = buffer_write_ptr(b, &n);
+    if(n < 1){
+        return -1;
+    }
+    buff[0] = status;
+    buffer_write_adv(b, 1);
+    return 1;
+}
+
+void request_close(struct request_parser *parser) {
+    if(parser->request.arg0 != NULL)
+        free(parser->request.arg0);
+    if(parser->request.arg1 != NULL)
+        free(parser->request.arg1);
 }
