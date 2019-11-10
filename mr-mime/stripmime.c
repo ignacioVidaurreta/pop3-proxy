@@ -256,7 +256,7 @@ static void
 boundary_border(struct ctx *ctx, const uint8_t c) {
     const struct parser_event* e = parser_feed(ctx->boundary_border, c);
     do {
-        debug("3. boun_border", parser_utils_strcmpi_event, e);
+        debug("3. boundary_border", parser_utils_strcmpi_event, e);
         switch(e->type) {
             case STRING_CMP_EQ:
                 ctx->msg_boundary_border_detected = &T;
@@ -292,8 +292,8 @@ boundary_border_end(struct ctx *ctx, const uint8_t c) {
                     char *border = calloc(2 + 1024, sizeof(char));
                     strcat(border, "--");
                     strcat(border, ctx->boundaries[ctx->boundaries_n-1]);
-                    //boundary_parser_definition = parser_utils_strcmpi(border);
-                    //boundary_parser_init(ctx->boundary_border, &boundary_parser_definition);
+                    boundary_parser_definition = parser_utils_strcmpi(border);
+                    boundary_parser_init(ctx->boundary_border, &boundary_parser_definition);
                 }
                 break;
             case BOUNDARY_BORDER_END_VALUE_END_CRLF:
@@ -414,6 +414,21 @@ mime_msg(struct ctx *ctx, const uint8_t c) {
             case MIME_MSG_VALUE_FOLD:
                 break;
             case MIME_MSG_VALUE_END:
+
+            if(ctx->msg_content_type_value_stored == NULL) { // caso en que el value de content-type no terminaba en ';' 
+                    if(strlen(ctx->content_type) > 0) {
+                        fprintf(stderr, "ctype: %s\n",ctx->content_type);
+                        if(is_blocked_type(ctx)) {
+                            printf(": text/plain\r\n");
+                            ctx->filter_curr_mime = &T;
+                        } else {
+                            printf(": %s\r\n", ctx->content_type);
+                            ctx->filter_curr_mime = &F;
+                        }
+                        ctx->multipart_curr_mime = is_multipart(ctx->content_type)? &T : &F;
+                        ctx->message_curr_mime   = is_message(ctx->content_type)? &T : &F;
+                    }
+                }
                 // si parseabamos Content-Type ya terminamos
                 ctx->msg_content_type_field_detected = NULL;
                 ctx->msg_content_type_value_stored = NULL;
@@ -447,8 +462,8 @@ mime_msg(struct ctx *ctx, const uint8_t c) {
                     char *border = calloc(2 + 1024, sizeof(char));
                     strcat(border, "--");
                     strcat(border, ctx->boundaries[ctx->boundaries_n-1]);
-                    //boundary_parser_definition = parser_utils_strcmpi(border);
-                    //boundary_parser_init(ctx->boundary_border, &boundary_parser_definition);
+                    boundary_parser_definition = parser_utils_strcmpi(border);
+                    boundary_parser_init(ctx->boundary_border, &boundary_parser_definition);
                 }
                 break;
             case MIME_MSG_BODY:
@@ -488,7 +503,7 @@ pop3_multi(struct ctx *ctx, const uint8_t c) {
             case POP3_MULTI_FIN:
                 // arrancamos de vuelta
                 parser_reset(ctx->msg);
-                ctx->msg_content_type_field_detected = NULL;
+                //ctx->msg_content_type_field_detected = NULL;
                 break;
         }
         e = e->next;
@@ -530,7 +545,7 @@ main(const int argc, const char **argv) {
 
 
         .content_type           = calloc(1024, sizeof(char)),
-        .blocked_type           = "text/html",
+        .blocked_type           = "image/png",
         .replacement_text       = "[[This content has been blocked due to security reasons.]]",
         .boundaries             = calloc(1024, sizeof(char *)),
         .boundaries_n           = 0,
@@ -549,8 +564,17 @@ main(const int argc, const char **argv) {
             pop3_multi(&ctx, data[i]);
         }
     } while(n > 0);
+    for(int i=0; i<1024; i++) {
+        free(ctx.boundaries[i]);
+    }
     parser_destroy(ctx.multi);
     parser_destroy(ctx.msg);
     parser_destroy(ctx.ctype_header);
+    parser_destroy(ctx.ctype_value);
+    parser_destroy(ctx.boundary_name);
+    parser_destroy(ctx.boundary_key);
+    parser_destroy(ctx.boundary_border);
+    parser_destroy(ctx.boundary_border_end);
+    parser_destroy(ctx.body);
     parser_utils_strcmpi_destroy(&media_header_def);
 }

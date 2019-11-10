@@ -28,6 +28,12 @@ parser_destroy(struct parser *p) {
     }
 }
 
+void
+boundary_parser_init(struct parser *parser, struct parser_definition *def) {
+    parser->def = def;
+    parser->state = def->start_state;
+}
+
 struct parser *
 parser_init(const unsigned *classes,
             const struct parser_definition *def) {
