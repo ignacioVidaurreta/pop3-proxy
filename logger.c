@@ -28,7 +28,7 @@ char *get_level_string(enum level msg_level){
 char *get_time(){
     time_t t = time(NULL);
     struct tm tm = *localtime(&t);
-    char time[10*sizeof(char)];
+    char* time= malloc(10*sizeof(char));
     sprintf(time, "%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);
     return time;
 }
@@ -59,15 +59,18 @@ void write_log(struct log_message* log){
 void log_port(char *msg, in_port_t port_num ){
     char* current_time = get_time();
     fprintf(stdout, "\033[0;36m[%s][ INFO ]\033[0m\t%s %d\n", current_time, msg, port_num);
+    free(current_time);
 }
 
 /* 
  *  Handles the creation and writing of the log
  */
 void logger(enum level msg_level, char *message, char *timestamp){
-    struct log_message* log = malloc(sizeof(*log)); //TODO: free in right place
+    struct log_message* log = malloc(sizeof(*log));
     log->msg_level = msg_level;
     log->message   = message;
     log->timestamp = timestamp;
     write_log(log);
+    free(log->timestamp);
+    free(log);
 }

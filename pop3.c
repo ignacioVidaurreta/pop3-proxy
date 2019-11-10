@@ -141,7 +141,7 @@ static void POP3_handle_connection(const int fd, const struct sockaddr* clientAd
     update_metrics_end_connection();
     logger(INFO, "Connection finished with a client", get_time());
     logger(METRICS, get_metrics(), get_time());
-    free_resources();
+    //free_resources();
 
     close(server_fd);
 }
@@ -198,10 +198,4 @@ int serve_POP3_concurrent_blocking(const int server){
             }
         }
     }
-}
-
-void free_resources() {
-    free(state);
-    free_config();
-    free_metrics();
 }

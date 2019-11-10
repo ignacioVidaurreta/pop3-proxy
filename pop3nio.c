@@ -815,3 +815,8 @@ static const struct state_definition client_statbl[] = {
 static const struct state_definition *pop3_describe_states(void) {
     return client_statbl;
 }
+
+void free_resources() {
+    free_config();
+    free_metrics();
+}
