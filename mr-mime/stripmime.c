@@ -552,6 +552,7 @@ main(const int argc, const char **argv) {
         .body                   = parser_init(init_char_class(), mime_body_parser()),
         .boundary_key           = parser_init(init_char_class(), mime_boundary_key_parser()),
         .boundary_border        = parser_init(init_char_class(), &boundary_border_def),
+        .boundary_border_end    = parser_init(init_char_class(), mime_boundary_border_end_parser()),
 
 
         .content_type           = calloc(1024, sizeof(char)),
