@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -pthread -std=c99 -pedantic -Wall -fsanitize=address -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE  
+CFLAGS = -pthread -std=c99 -pedantic -Wall -fsanitize=address -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE -ggdb3 
 GREEN = \e[92m
 NORMAL = \e[0m
 FILES=./*.c
@@ -38,4 +38,7 @@ run: all
 
 gdb: debug
 	gdb $(EXEC_NAME)_debug
+
+valgrind: all
+	valgrind --leak-check=yes ./$(EXEC_NAME)
 

@@ -28,7 +28,7 @@ char *get_level_string(enum level msg_level){
 char *get_time(){
     time_t t = time(NULL);
     struct tm tm = *localtime(&t);
-    char *time = malloc(10*sizeof(char)); //TODO: free in right place
+    char time[10*sizeof(char)];
     sprintf(time, "%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);
     return time;
 }
