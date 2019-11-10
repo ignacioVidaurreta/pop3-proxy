@@ -34,22 +34,22 @@ enum state {
 ///////////////////////////////////////////////////////////////////////////////
 // Acciones
 
-static void
-value(struct parser_event *ret, const uint8_t c) {
-    ret->type    = BOUNDARY_BORDER_END_VALUE;
-    ret->n       = 1;
-    ret->data[0] = c;
-}
+// static void
+// value(struct parser_event *ret, const uint8_t c) {
+//     ret->type    = BOUNDARY_BORDER_END_VALUE;
+//     ret->n       = 1;
+//     ret->data[0] = c;
+// }
 
-static void
-value_hyphen(struct parser_event *ret, const uint8_t c) {
-    value(ret, '-');
-}
+// static void
+// value_hyphen(struct parser_event *ret, const uint8_t c) {
+//     value(ret, '-');
+// }
 
-static void
-value_cr(struct parser_event *ret, const uint8_t c) {
-    value(ret, '\r');
-}
+// static void
+// value_cr(struct parser_event *ret, const uint8_t c) {
+//     value(ret, '\r');
+// }
 
 static void
 end_hyphen(struct parser_event *ret, const uint8_t c) {
@@ -134,7 +134,7 @@ static struct parser_state_transition ST_ERROR_CR[] =  {
 ///////////////////////////////////////////////////////////////////////////////
 // Declaración formal
 
-static struct parser_state_transition *states [] = {    
+static const struct parser_state_transition *states [] = {    
     ST_BORDER_END_VALUE,
     ST_BORDER_END_VALUE_HYPHEN,
     ST_BORDER_END_VALUE_HYPHEN_HYPHEN,

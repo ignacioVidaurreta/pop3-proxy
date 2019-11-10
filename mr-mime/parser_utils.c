@@ -143,7 +143,7 @@ struct parser_definition
 parser_utils_strcmpi_ignore_lwsp(const char *s) {
     const size_t n = strlen(s);
 
-    struct parser_state_transition **states     = calloc(n + 3, sizeof(*states));
+    const struct parser_state_transition **states     = calloc(n + 3, sizeof(*states));
     size_t *nstates                             = calloc(n + 3, sizeof(*nstates));
     struct parser_state_transition *transitions = calloc(3 * (n + 3),
                                                          sizeof(*transitions));
@@ -213,7 +213,7 @@ parser_utils_strcmpi_ignore_lwsp(const char *s) {
     struct parser_definition def = {
             .start_state   = 0,
             .states_count  = n + 3,
-            .states        = (struct parser_state_transition **) states,
+            .states        = states,
             .states_n      = (size_t *) nstates,
     };
 

@@ -30,18 +30,17 @@ enum state {
 ///////////////////////////////////////////////////////////////////////////////
 // Acciones
 
-static void
-value0(struct parser_event *ret, const uint8_t c) {
-    ret->type    = BODY_VALUE0;
-    ret->n       = 1;
-    ret->data[0] = c;
-}
-
-static void
-value1(struct parser_event *ret, const uint8_t c) {
-    ret->type    = BODY_VALUE;
-    ret->n       = 0;
-}
+// static void
+// value0(struct parser_event *ret, const uint8_t c) {
+//     ret->type    = BODY_VALUE0;
+//     ret->n       = 1;
+//     ret->data[0] = c;
+// }
+// static void
+// value1(struct parser_event *ret, const uint8_t c) {
+//     ret->type    = BODY_VALUE;
+//     ret->n       = 0;
+// }
 
 static void
 value(struct parser_event *ret, const uint8_t c) {
@@ -91,7 +90,7 @@ static struct parser_state_transition ST_ERROR[] =  {
 ///////////////////////////////////////////////////////////////////////////////
 // Declaración formal
 
-static struct parser_state_transition *states [] = {
+static const struct parser_state_transition *states [] = {
         ST_BODY,
         ST_BODY_CR,
         ST_ERROR,
@@ -130,6 +129,8 @@ mime_body_event(enum mime_body_event_type type) {
             break;
         case BODY_UNEXPECTED:
             ret = "error(c)";
+            break;
+        default:
             break;
     }
     return ret;

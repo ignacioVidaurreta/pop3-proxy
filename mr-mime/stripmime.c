@@ -36,8 +36,7 @@ debug(const char *p,
         //fprintf(stderr, "%-8s: %-14s\n", p, namefnc(e->type));
     } else {
         for (int j = 0; j < e->n; j++) {
-            const char* name = (j == 0) ? namefnc(e->type)
-                                        : "";
+            //const char* name = (j == 0) ? namefnc(e->type) : "";
             if (e->data[j] <= ' ') {
                 //fprintf(stderr, "%-8s: %-14s 0x%02X\n", p, name, e->data[j]);
             } else {

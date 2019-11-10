@@ -49,9 +49,9 @@ struct parser_definition {
     /** cantidad de estados */
     unsigned                         states_count;
     /** por cada estado, sus transiciones */
-    struct parser_state_transition **states;
+    const struct parser_state_transition **states;
     /** cantidad de estados por transición */
-    size_t                          *states_n;
+    const size_t                          *states_n;
 
     /** estado inicial */
     unsigned                         start_state;
@@ -65,6 +65,10 @@ struct parser_definition {
 struct parser *
 parser_init    (const unsigned *classes,
                 const struct parser_definition *def);
+
+void
+boundary_parser_init(struct parser *parser, 
+                        struct parser_definition *def);
 
 /** destruye el parser */
 void

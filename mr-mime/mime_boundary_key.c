@@ -65,7 +65,7 @@ static struct parser_state_transition ST_ERROR[] =  {
 ///////////////////////////////////////////////////////////////////////////////
 // Declaración formal
 
-static struct parser_state_transition *states [] = {    
+static const struct parser_state_transition *states [] = {    
     ST_KEY_VALUE,
     ST_ERROR,
 };

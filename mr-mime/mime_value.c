@@ -83,7 +83,7 @@ static struct parser_state_transition ST_ERROR[] =  {
 ///////////////////////////////////////////////////////////////////////////////
 // Declaración formal
 
-static struct parser_state_transition *states [] = {
+const static struct parser_state_transition *states [] = {
         ST_VALUE0,
         ST_VALUE,
         ST_ERROR,
@@ -91,7 +91,7 @@ static struct parser_state_transition *states [] = {
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 
-static size_t states_n [] = {        
+static const size_t states_n [] = {        
         N(ST_VALUE0),
         N(ST_VALUE),
         N(ST_ERROR),
