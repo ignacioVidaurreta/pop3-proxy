@@ -279,7 +279,6 @@ mime_msg(struct ctx *ctx, const uint8_t c) {
             case MIME_MSG_NAME_END:
                 // lo dejamos listo para el próximo header
                 parser_reset(ctx->ctype_header);
-                ctx->msg_content_type_field_detected = NULL;
 //                 if (ctx->msg_content_type_field_detected != NULL
 //                  && *ctx->msg_content_type_field_detected){
 //                     ctx->print_curr_char = &F;
@@ -287,7 +286,7 @@ mime_msg(struct ctx *ctx, const uint8_t c) {
                 break;
             case MIME_MSG_VALUE:
                 if(ctx->msg_content_type_field_detected != 0
-                && ctx->msg_content_type_field_detected) {
+                && *ctx->msg_content_type_field_detected) {
                     if( ctx->msg_content_type_value_stored == NULL) {
                         for(int i = 0; i < e->n; i++) {
                             content_type_value(ctx, e->data[i]);
@@ -365,8 +364,10 @@ main(const int argc, const char **argv) {
         .multi        = parser_init(no_class, pop3_multi_parser()),
         .msg          = parser_init(init_char_class(), mime_message_parser()),
         .ctype_header = parser_init(no_class, &media_header_def),
+        .ctype_value            = parser_init(init_char_class(), mime_value_parser()),
         .boundary_name     = parser_init(init_char_class(), &boundary_name_def),
 
+        .content_type           = calloc(1024, sizeof(char)),
     };
 
     uint8_t data[4096];
