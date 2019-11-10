@@ -107,7 +107,7 @@ void get_concurrent_connections(int conn_sock){
 }
 
 void get_transferred_bytes(int conn_sock){
-    uint8_t command = 0x04, nargs = 0;
+    uint8_t command = 0x05, nargs = 0;
     int ret;
     uint8_t datagram[MAX_DATAGRAM_SIZE];
     uint8_t response[MAX_DATAGRAM_SIZE];

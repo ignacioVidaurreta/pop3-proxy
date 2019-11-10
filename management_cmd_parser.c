@@ -74,7 +74,7 @@ enum parser_state parse_arguments_number(struct request_parser * parser, uint8_t
 }
 
 enum parser_state parse_cmd(struct request_parser * parser, const uint8_t c){
-    if( c <= (uint8_t)0x04 ){
+    if( c <= (uint8_t)QUIT ){
         parser->request.cmd = c;
         return READING_ARGS_NUM;
     }
