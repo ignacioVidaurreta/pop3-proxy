@@ -93,5 +93,8 @@ parser_feed     (struct parser *p, const uint8_t c);
 const unsigned *
 parser_no_classes(void);
 
+void
+boundary_parser_init(struct parser *parser, struct parser_definition *def);
+
 
 #endif

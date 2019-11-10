@@ -6,6 +6,8 @@
 #include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
+#include <strings.h>
+#include <malloc.h>
 
 #include "parser.h"
 #include "parser_utils.h"
@@ -165,7 +167,7 @@ content_type_value(struct ctx *ctx, const uint8_t c) {
                 ctx->msg_content_type_value_stored = NULL;
                 break;
             case VALUE_END:
-                fprintf(stderr, "ctype: %s\n",ctx->content_type);
+                //fprintf(stderr, "ctype: %s\n",ctx->content_type);
                 ctx->msg_content_type_value_stored = &T;
                 if(is_blocked_type(ctx)) {
                     printf(": text/plain");
@@ -235,7 +237,7 @@ boundary_key(struct ctx *ctx, const uint8_t c) {
                 nappend(ctx->boundaries[ctx->boundaries_n], c, 1024);
                 break;
             case BOUNDARY_KEY_VALUE_END:
-                fprintf(stderr, "boundary: %s\n",ctx->boundaries[ctx->boundaries_n]);
+                //fprintf(stderr, "boundary: %s\n",ctx->boundaries[ctx->boundaries_n]);
                 ctx->boundaries_n++;
                 ctx->msg_boundary_key_stored = &T;
                 break;
@@ -416,7 +418,7 @@ mime_msg(struct ctx *ctx, const uint8_t c) {
 
             if(ctx->msg_content_type_value_stored == NULL) { // caso en que el value de content-type no terminaba en ';' 
                     if(strlen(ctx->content_type) > 0) {
-                        fprintf(stderr, "ctype: %s\n",ctx->content_type);
+                        //fprintf(stderr, "ctype: %s\n",ctx->content_type);
                         if(is_blocked_type(ctx)) {
                             printf(": text/plain\r\n");
                             ctx->filter_curr_mime = &T;
@@ -521,6 +523,11 @@ main(const int argc, const char **argv) {
         }
     }
 
+
+    char *replacement_text = getenv("FILTER_MSG");
+    char *aux_replacement_text = "[[This content has been blocked due to security reasons.]]";
+    char *blocked_type    = getenv("FILTER_MEDIAS");
+
     const unsigned int* no_class = parser_no_classes();
     struct parser_definition media_header_def =
             parser_utils_strcmpi("content-type");
@@ -544,8 +551,8 @@ main(const int argc, const char **argv) {
 
 
         .content_type           = calloc(1024, sizeof(char)),
-        .blocked_type           = "image/png",
-        .replacement_text       = "[[This content has been blocked due to security reasons.]]",
+        .blocked_type           = blocked_type != NULL ? blocked_type:"text/plain",
+        .replacement_text       = replacement_text !=NULL ? replacement_text:aux_replacement_text,
         .boundaries             = calloc(1024, sizeof(char *)),
         .boundaries_n           = 0,
         .output_enabled         = &T,
