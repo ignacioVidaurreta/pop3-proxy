@@ -5,13 +5,20 @@
 #include <string.h>
 #include <ctype.h>
 #include <string.h>
+#include <stdlib.h>
 
+#include "parser.h"
 #include "parser_utils.h"
 #include "pop3_multi.h"
 #include "mime_chars.h"
 #include "mime_msg.h"
 #include "mime_value.h"
 #include "mime_boundary_key.h"
+#include "mime_boundary_border_end.h"
+#include "mime_body.h"
+
+
+struct parser_definition boundary_parser_definition;
 
 /*
  * imprime información de debuging sobre un evento.
@@ -26,15 +33,15 @@ debug(const char *p,
       const struct parser_event* e) {
     // DEBUG: imprime
     if (e->n == 0) {
-        fprintf(stderr, "%-8s: %-14s\n", p, namefnc(e->type));
+        //fprintf(stderr, "%-8s: %-14s\n", p, namefnc(e->type));
     } else {
         for (int j = 0; j < e->n; j++) {
             const char* name = (j == 0) ? namefnc(e->type)
                                         : "";
             if (e->data[j] <= ' ') {
-                fprintf(stderr, "%-8s: %-14s 0x%02X\n", p, name, e->data[j]);
+                //fprintf(stderr, "%-8s: %-14s 0x%02X\n", p, name, e->data[j]);
             } else {
-                fprintf(stderr, "%-8s: %-14s %c\n", p, name, e->data[j]);
+                //fprintf(stderr, "%-8s: %-14s %c\n", p, name, e->data[j]);
             }
         }
     }
@@ -104,6 +111,8 @@ struct ctx {
     char *filter_msg;
 
     char *blocked_type;
+
+    bool *output_enabled;
 };
 
 static bool T = true;
@@ -194,6 +203,7 @@ content_type_value(struct ctx *ctx, const uint8_t c) {
                 }
                 ctx->multipart_curr_mime = is_multipart(ctx->content_type)? &T : &F;
                 ctx->message_curr_mime = is_message(ctx->content_type)? &T : &F;
+                ctx->output_enabled = &T;
                 break;
             case WAIT:
                 break;
@@ -246,7 +256,7 @@ static void
 boundary_key(struct ctx *ctx, const uint8_t c) {
     const struct parser_event* e = parser_feed(ctx->boundary_key, c);
     do {
-        debug("2.boundary_key", mime_boundary_key_event, e);
+        //debug("2.boundary_key", mime_boundary_key_event, e);
         switch(e->type) {
             case BOUNDARY_KEY_VALUE:
                 nappend(ctx->boundaries[ctx->boundaries_n], c, 1024);
@@ -257,6 +267,116 @@ boundary_key(struct ctx *ctx, const uint8_t c) {
                 ctx->msg_boundary_key_stored = &T;
                 break;
             case BOUNDARY_KEY_UNEXPECTED:
+                break;
+        }
+        e = e->next;
+    } while (e != NULL);
+
+}
+
+/* Detecta si la linea consiste de "--" seguido del ultimo boundary_key. Tres valores
+ * posibles: NULL (no tenemos información suficiente todavia), 
+ * true si matchea, false si no matchea.
+ */
+static void
+boundary_border(struct ctx *ctx, const uint8_t c) {
+    const struct parser_event* e = parser_feed(ctx->boundary_border, c);
+    do {
+        debug("3. boun_border", parser_utils_strcmpi_event, e);
+        switch(e->type) {
+            case STRING_CMP_EQ:
+                ctx->msg_boundary_border_detected = &T;
+                parser_reset(ctx->boundary_border);
+                break;
+            case STRING_CMP_NEQ:    
+                ctx->msg_boundary_border_detected = &F;
+                parser_reset(ctx->boundary_border);
+                break;
+        }
+        e = e->next;
+    } while (e != NULL);
+}
+
+/* Detecta si luego del boundary key hay un "--\r\n", "\r\n" u otra cosa.
+ */
+static void
+boundary_border_end(struct ctx *ctx, const uint8_t c) {
+    const struct parser_event* e = parser_feed(ctx->boundary_border_end, c);
+    do {
+        //debug("3.  border_end", mime_boundary_border_end_event, e);
+        switch(e->type) {
+           case BOUNDARY_BORDER_END_VALUE:
+                break;
+            case BOUNDARY_BORDER_END_VALUE_END_HYPHENS:
+                ctx->boundaries_n--;
+                ctx->boundaries[ctx->boundaries_n] = 0;
+                ctx->msg_boundary_border_detected  = NULL;
+                ctx->output_enabled = &T;
+                parser_reset(ctx->boundary_border_end);
+                parser_reset(ctx->boundary_border);
+                if(ctx->boundaries_n > 0) {
+                    char *border = calloc(2 + 1024, sizeof(char));
+                    strcat(border, "--");
+                    strcat(border, ctx->boundaries[ctx->boundaries_n-1]);
+                    //boundary_parser_definition = parser_utils_strcmpi(border);
+                    //boundary_parser_init(ctx->boundary_border, &boundary_parser_definition);
+                }
+                break;
+            case BOUNDARY_BORDER_END_VALUE_END_CRLF:
+                ctx->msg_boundary_border_detected = NULL;
+                if(!*ctx->multipart_curr_mime) {
+                    ctx->output_enabled = &T;
+                }
+                if(!*ctx->multipart_curr_mime || !*ctx->filter_curr_mime) {
+                    parser_reset(ctx->msg);
+                }
+                parser_reset(ctx->boundary_border_end);
+                break;
+            case BOUNDARY_BORDER_END_WAIT:
+                break;
+            case BOUNDARY_BORDER_END_UNEXPECTED:
+                ctx->msg_boundary_border_detected = &F;
+                break;
+            case BOUNDARY_BORDER_END_UNEXPECTED_CRLF:
+                ctx->msg_boundary_border_detected = &F;
+                parser_reset(ctx->boundary_border);
+                parser_reset(ctx->boundary_border_end);
+                break;
+        }
+        e = e->next;
+    } while (e != NULL);
+}
+
+/* 
+ * Procesa el body
+ */
+static void
+body(struct ctx *ctx, const uint8_t c) {
+    const struct parser_event* e = parser_feed(ctx->body, c);
+    do {
+        //debug("2.        body", mime_body_event, e);
+        switch(e->type) {
+            case BODY_VALUE:
+                if(ctx->boundaries_n > 0) {
+                    if(ctx->msg_boundary_border_detected == NULL) {
+                        for(int i = 0; i < e->n; i++) {
+                            boundary_border(ctx, e->data[i]);
+                        }
+                    } else if(*ctx->msg_boundary_border_detected) {
+                        for(int i = 0; i < e->n; i++) {
+                            boundary_border_end(ctx, e->data[i]);
+                        }
+                    }
+                    if(e->data[0] == '\n') {
+                        ctx->msg_boundary_border_detected = NULL;
+                        parser_reset(ctx->boundary_border);
+                        parser_reset(ctx->boundary_border_end);
+                    }
+                }
+                break;            
+            case BODY_WAIT:
+                break;
+            case BODY_UNEXPECTED:
                 break;
         }
         e = e->next;
@@ -290,10 +410,11 @@ mime_msg(struct ctx *ctx, const uint8_t c) {
             case MIME_MSG_NAME_END:
                 // lo dejamos listo para el próximo header
                 parser_reset(ctx->ctype_header);
-//                 if (ctx->msg_content_type_field_detected != NULL
-//                  && *ctx->msg_content_type_field_detected){
-//                     ctx->print_curr_char = &F;
-//                  }
+
+                if (ctx->msg_content_type_field_detected != NULL
+                 && *ctx->msg_content_type_field_detected){
+                    ctx->output_enabled = &F;
+                 }
                 break;
             case MIME_MSG_VALUE:
                 if(ctx->msg_content_type_field_detected != 0
@@ -320,7 +441,50 @@ mime_msg(struct ctx *ctx, const uint8_t c) {
                 break;
             case MIME_MSG_VALUE_END:
                 // si parseabamos Content-Type ya terminamos
-                ctx->msg_content_type_field_detected = 0;
+                ctx->msg_content_type_field_detected = NULL;
+                ctx->msg_content_type_value_stored = NULL;
+                ctx->msg_boundary_name_detected = NULL;
+                ctx->msg_boundary_key_stored = NULL;
+                ctx->content_type[0] = 0;
+                ctx->output_enabled = &T;
+                
+                parser_reset(ctx->ctype_value);
+                parser_reset(ctx->boundary_name);
+                parser_reset(ctx->boundary_key);
+                break;
+            case MIME_MSG_BODY_START:
+                if(*ctx->filter_curr_mime) {
+                    printf("\r\n");
+                    if(*ctx->multipart_curr_mime) {
+                        printf("--%s\r\n", ctx->boundaries[ctx->boundaries_n-1]);
+                    }
+                    printf("%s\r\n", ctx->filter_msg);
+                    if(!*ctx->multipart_curr_mime) {
+                        printf("--%s", ctx->boundaries[ctx->boundaries_n-1]);                    
+                    }
+                    ctx->output_enabled = &F;
+                } else {
+                    if(*ctx->message_curr_mime) {
+                        parser_reset(ctx->msg);
+                    }
+                    ctx->output_enabled = &T;
+                }
+                if(ctx->boundaries_n > 0) {
+                    char *border = calloc(2 + 1024, sizeof(char));
+                    strcat(border, "--");
+                    strcat(border, ctx->boundaries[ctx->boundaries_n-1]);
+                    //boundary_parser_definition = parser_utils_strcmpi(border);
+                    //boundary_parser_init(ctx->boundary_border, &boundary_parser_definition);
+                }
+                break;
+            case MIME_MSG_BODY:
+                for(int i = 0; i < e->n; i++) {
+                    body(ctx, e->data[i]);
+                }
+                break;
+            case MIME_MSG_WAIT:
+                break;
+            case MIME_MSG_UNEXPECTED:
                 break;
         }
         e = e->next;
@@ -337,6 +501,11 @@ pop3_multi(struct ctx *ctx, const uint8_t c) {
             case POP3_MULTI_BYTE:
                 for(int i = 0; i < e->n; i++) {
                     mime_msg(ctx, e->data[i]);
+                }
+                if( ctx->output_enabled != NULL && *ctx->output_enabled) {
+                    for(int i = 0; i < e->n; i++) {
+                        printf("%c", e->data[i]);
+                    }
                 }
                 break;
             case POP3_MULTI_WAIT:
@@ -371,19 +540,25 @@ main(const int argc, const char **argv) {
     struct parser_definition boundary_name_def =
             parser_utils_strcmpi_ignore_lwsp("boundary=\"");
 
+    struct parser_definition boundary_border_def =
+            parser_utils_strcmpi("--bounds");
+
     struct ctx ctx = {
         .multi        = parser_init(no_class, pop3_multi_parser()),
         .msg          = parser_init(init_char_class(), mime_message_parser()),
         .ctype_header = parser_init(no_class, &media_header_def),
         .ctype_value            = parser_init(init_char_class(), mime_value_parser()),
         .boundary_name     = parser_init(init_char_class(), &boundary_name_def),
+        .body                   = parser_init(init_char_class(), mime_body_parser()),
         .boundary_key           = parser_init(init_char_class(), mime_boundary_key_parser()),
+        .boundary_border        = parser_init(init_char_class(), &boundary_border_def),
 
 
         .content_type           = calloc(1024, sizeof(char)),
         .blocked_type           = "application/octet-stream",
         .boundaries             = calloc(1024, sizeof(char *)),
         .boundaries_n           = 0,
+        .output_enabled         = &T,
     };
 
     for(int i=0; i<1024; i++) {
@@ -398,7 +573,6 @@ main(const int argc, const char **argv) {
             pop3_multi(&ctx, data[i]);
         }
     } while(n > 0);
-
     parser_destroy(ctx.multi);
     parser_destroy(ctx.msg);
     parser_destroy(ctx.ctype_header);
