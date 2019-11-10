@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
-#include <strings.h>
+#include <string.h>
 
 #include "parser_utils.h"
 #include "pop3_multi.h"
@@ -227,6 +227,17 @@ boundary_name(struct ctx *ctx, const uint8_t c) {
     } while (e != NULL);
 }
 
+int nappend(char *word, char c, int n) {
+    int len = strlen(word);
+    if(len < n) {
+        word[len] = c;
+        word[len+1] = 0;
+        return 0;
+    } else {
+        return -1;
+    }
+}
+
 /**
  * Guarda un boundary key.
  * El valor se guarda en ctx->boundaries[ctx->boundaries_n]
@@ -238,7 +249,7 @@ boundary_key(struct ctx *ctx, const uint8_t c) {
         debug("2.boundary_key", mime_boundary_key_event, e);
         switch(e->type) {
             case BOUNDARY_KEY_VALUE:
-                append(ctx->boundaries[ctx->boundaries_n], c);
+                nappend(ctx->boundaries[ctx->boundaries_n], c, 1024);
                 break;
             case BOUNDARY_KEY_VALUE_END:
                 fprintf(stderr, "boundary: %s\n",ctx->boundaries[ctx->boundaries_n]);
@@ -366,9 +377,18 @@ main(const int argc, const char **argv) {
         .ctype_header = parser_init(no_class, &media_header_def),
         .ctype_value            = parser_init(init_char_class(), mime_value_parser()),
         .boundary_name     = parser_init(init_char_class(), &boundary_name_def),
+        .boundary_key           = parser_init(init_char_class(), mime_boundary_key_parser()),
+
 
         .content_type           = calloc(1024, sizeof(char)),
+        .blocked_type           = "application/octet-stream",
+        .boundaries             = calloc(1024, sizeof(char *)),
+        .boundaries_n           = 0,
     };
+
+    for(int i=0; i<1024; i++) {
+        ctx.boundaries[i] = calloc(1024, sizeof(char));
+    }   
 
     uint8_t data[4096];
     int n;
