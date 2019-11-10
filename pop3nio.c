@@ -11,6 +11,8 @@
 #include <pthread.h>
 #include <poll.h>
 
+
+#include "include/pop3nio.h"
 #include "include/metrics.h"
 #include "include/buffer.h"
 #include "include/stm.h"
@@ -38,8 +40,6 @@ extern struct metrics_manager *metrics;
  * contención.
  */
 
-// static const unsigned  max_pool  = 50; // tamaño máximo
-// static unsigned        pool_size = 0;  // tamaño actual
 static struct pop3     *pool     = 0;  // pool propiamente dicho
 
 static const struct state_definition *
@@ -76,9 +76,9 @@ pop3_new(int client_fd){
     buffer_init(&ret->write_buffer, N(ret->raw_buff_b), ret->raw_buff_b);
     buffer_init(&ret->request_buffer, N(ret->raw_buff_c), ret->raw_buff_c);
     buffer_init(&ret->cmd_request_buffer, N(ret->raw_buff_d), ret->raw_buff_d);
+    buffer_init(&ret->request_aux_buffer,  N(ret->raw_buff_d), ret->raw_buff_d);
 
     metrics->concurrent_connections++;
-    //TODAVIA NO TENEMOS LA STRUCT GLOBAL METRICS REFERENCIADA EN ESTE ARCHIVO
 
     ret->references = 1;
 finally:
@@ -144,6 +144,7 @@ static ssize_t send_next_request(struct selector_key *key, buffer *b) {
         aptr = buffer_write_ptr(ab, &acount);
         memcpy(aptr, cptr, count);
         buffer_write_adv(ab, count);
+
     }
     else {
         n = send(ATTACHMENT(key)->origin_fd, cptr, count, MSG_NOSIGNAL);
@@ -296,21 +297,37 @@ static unsigned response_write(struct selector_key *key){
         ss |= selector_set_interest_key(key, OP_NOOP);
         ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_READ);
         ret = SELECTOR_SUCCESS == ss ? RESPONSE : ERROR;
+    }else{
+        if(ret != DONE){
+            if(ATTACHMENT(key)->has_pipelining){
+                struct next_request *aux = ATTACHMENT(key)->client.request.next_cmd_type;
+                selector_status ss = SELECTOR_SUCCESS;
+                ss |= selector_set_interest_key(key, OP_NOOP);
+                if (aux != NULL) {
+                    ATTACHMENT(key)->client.request.cmd_type = aux->cmd_type;
+                    ATTACHMENT(key)->client.request.next_cmd_type = aux->next;
+                    free(aux);
+                    ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_WRITE);
+                    ret = ss == SELECTOR_SUCCESS ? RESPONSE : ERROR;
+                }
+            }else{
+                selector_status ss = SELECTOR_SUCCESS;
+                ss |= selector_set_interest_key(key, OP_NOOP);
+                if(strcmp((char*)d->wb->limit, "quit\n") == 0){
+                    metrics->concurrent_connections--;
+                    return DONE;
+                }else if (buffer_can_read(b)) {
+                    ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_WRITE);
+                    ret = ss == SELECTOR_SUCCESS ? RESPONSE : ERROR;
+                }
+                else {
+                    ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_WRITE);
+                    ret = SELECTOR_SUCCESS == ss ? REQUEST : ERROR;
+                }
+            }
+        }
     }
 
-    selector_status ss = SELECTOR_SUCCESS;
-    ss |= selector_set_interest_key(key, OP_NOOP);
-    if(strcmp((char*)d->wb->limit, "quit\n") == 0){
-        metrics->concurrent_connections--;
-        return DONE;
-    }else if (buffer_can_read(b)) {
-        ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_WRITE);
-        ret = ss == SELECTOR_SUCCESS ? RESPONSE : ERROR;
-    }
-    else {
-        ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_WRITE);
-        ret = SELECTOR_SUCCESS == ss ? REQUEST : ERROR;
-    }
 
     return ret;
 }
@@ -622,13 +639,75 @@ ehlo_write(struct selector_key *key) {
         selector_status ss = SELECTOR_SUCCESS;
         ss |= selector_set_interest_key(key, OP_NOOP);
         ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_WRITE);
-//        ret = SELECTOR_SUCCESS == ss ? CAPA : ERROR; TODO:implement CAPA STATE
-        ret = SELECTOR_SUCCESS == ss ? REQUEST : ERROR;
+        ret = SELECTOR_SUCCESS == ss ? CAPA_STATE : ERROR;
     }
 
     return ret;
 }
 
+
+///////      CAPA      ///////
+static void capa_init(const unsigned state, struct selector_key *key){
+    struct response_st * d     = &ATTACHMENT(key)->origin.response;
+    d->rb = &ATTACHMENT(key)->read_buffer;
+    d->wb = &ATTACHMENT(key)->write_buffer;
+}
+
+static unsigned capa_read(struct selector_key *key){
+    struct response_st *d = &ATTACHMENT(key)->origin.response;
+    enum pop3_state ret = CAPA_STATE;
+
+    buffer* b = d->rb;
+    uint8_t *ptr;
+    size_t count;
+    ssize_t n;
+
+    ptr = buffer_write_ptr(b, &count);
+    n = recv(key->fd, ptr, count, 0);
+
+    if(n > 0){
+        if(strstr((char*) ptr, "PIPELINING"))
+            ATTACHMENT(key)->has_pipelining = true;
+
+        if (!strstr((char*)ptr, "\r\n.\r\n")) { // It hasn't finished reading yet
+            selector_status ss = SELECTOR_SUCCESS;
+            ss |= selector_set_interest_key(key, OP_NOOP);
+            ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_READ);
+            ret = SELECTOR_SUCCESS == ss ? CAPA_STATE : ERROR;
+        }else{
+            buffer_reset(b);
+            selector_status ss = SELECTOR_SUCCESS;
+            ss |= selector_set_interest_key(key, OP_NOOP);
+            ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_READ);
+            ret = SELECTOR_SUCCESS == ss ? REQUEST : ERROR;
+        }
+    }else{
+        ret = ERROR;
+    }
+
+    if(ret == ERROR){
+        print_error("There was an error reading CAPA response from server", get_time());
+    }
+
+    return ret;
+}
+
+static unsigned capa_write(struct selector_key *key){
+    enum pop3_state ret = CAPA_STATE;
+
+    char * msg = "CAPA\r\n";
+    send(ATTACHMENT(key)->origin_fd, msg, strlen(msg), MSG_NOSIGNAL);
+
+    selector_status ss = SELECTOR_SUCCESS;
+    ss |= selector_set_interest_key(key, OP_NOOP);
+    ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_READ);
+    ret = SELECTOR_SUCCESS == ss ? CAPA_STATE : ERROR;
+
+    if(ret == ERROR) {
+        print_error("There was an error writing CAPA request to origin", get_time());
+    }
+    return ret;
+}
 
 
 ///////      REQUEST      ///////
@@ -638,6 +717,7 @@ static void request_init(const unsigned state, struct selector_key *key) {
     struct request_st * d = &ATTACHMENT(key)->client.request;
     d->buffer = &ATTACHMENT(key)->request_buffer;
     d->cmd_buffer = &ATTACHMENT(key)->cmd_request_buffer;
+    d->aux_buffer = &ATTACHMENT(key)->request_aux_buffer;
 }
 
 /** Lee la request del cliente */
@@ -664,7 +744,7 @@ static unsigned request_read(struct selector_key *key){
     }
 
     if(ret == ERROR) {
-        //print_error_with_address(ATTACHMENT(key)->client_addr, "Error reading client response"); TODO(Nachito)
+        print_error("Error reading from client", get_time());
     }
     return ret;
 }
@@ -688,15 +768,16 @@ static unsigned request_write(struct selector_key *key) {
         ret = SELECTOR_SUCCESS == ss ? REQUEST : ERROR;
     }
     else {
+        // Keep writing until there is no more to write
         if (ATTACHMENT(key)->has_pipelining) {
             if (buffer_can_read(b)) {
-                if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_WRITE)) {
+                if(selector_set_interest_key(key, OP_WRITE) == SELECTOR_SUCCESS) {
                     ret = REQUEST;
                 } else {
                     ret = ERROR;
                 }
             }
-            else {
+            else { // IF you can0t read, read from auxiliar buffer
                 buffer *ab            = d->aux_buffer;
                 uint8_t *aptr;
                 size_t  count;
@@ -726,8 +807,7 @@ static unsigned request_write(struct selector_key *key) {
     }
 
     if(ret == ERROR) {
-        //print_error_message_with_client_ip(ATTACHMENT(key)->client_addr, "error writing client request to origin server");
-        //TODO ERROR
+        print_error("Error writing to origin server", get_time());
     }
 
     return ret;
@@ -785,9 +865,9 @@ static const struct state_definition client_statbl[] = {
         .on_write_ready   = ehlo_write,
     },{
         .state            = CAPA_STATE,
-        .on_arrival       = request_init,
-        .on_read_ready    = request_read,
-        .on_write_ready   = request_write,
+        .on_arrival       = capa_init,
+        .on_read_ready    = capa_read,
+        .on_write_ready   = capa_write,
     },{
         .state            = REQUEST,
         .on_arrival       = request_init,

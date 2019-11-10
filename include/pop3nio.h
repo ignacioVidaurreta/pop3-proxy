@@ -169,8 +169,8 @@ struct pop3 {
     // } filter;
 
     /** buffers para ser usados read_buffer, write_buffer.*/
-    uint8_t raw_buff_a[2048], raw_buff_b[2048], raw_buff_c[2048], raw_buff_d[2048]; //Si necesitamos más buffers, los podemos agregar aca.
-    buffer read_buffer, write_buffer, request_buffer, cmd_request_buffer;
+    uint8_t raw_buff_a[BUFFER_MAX_SIZE], raw_buff_b[BUFFER_MAX_SIZE], raw_buff_c[BUFFER_MAX_SIZE], raw_buff_d[BUFFER_MAX_SIZE]; //Si necesitamos más buffers, los podemos agregar aca.
+    buffer read_buffer, write_buffer, request_buffer, cmd_request_buffer, request_aux_buffer;
     
     /** cantidad de referencias a este objeto. si es uno se debe destruir */
     unsigned references;
