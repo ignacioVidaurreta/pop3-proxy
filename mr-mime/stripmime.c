@@ -508,7 +508,7 @@ pop3_multi(struct ctx *ctx, const uint8_t c) {
                 break;
         }
         e = e->next;
-//        getchar();
+       // getchar();
     } while (e != NULL);
 }
 
@@ -551,7 +551,7 @@ main(const int argc, const char **argv) {
 
 
         .content_type           = calloc(1024, sizeof(char)),
-        .blocked_type           = blocked_type != NULL ? blocked_type:"text/plain",
+        .blocked_type           = blocked_type,
         .replacement_text       = replacement_text !=NULL ? replacement_text:aux_replacement_text,
         .boundaries             = calloc(1024, sizeof(char *)),
         .boundaries_n           = 0,
