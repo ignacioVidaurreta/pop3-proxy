@@ -10,8 +10,8 @@
 #include <sys/wait.h>
 #include <pthread.h>
 #include <poll.h>
-#include <metrics.h>
 
+#include "include/metrics.h"
 #include "include/buffer.h"
 #include "include/stm.h"
 #include "include/pop3nio.h"
@@ -303,6 +303,7 @@ static unsigned response_write(struct selector_key *key){
     selector_status ss = SELECTOR_SUCCESS;
     ss |= selector_set_interest_key(key, OP_NOOP);
     if(strcmp((char*)d->wb->limit, "quit\n") == 0){
+        metrics->concurrent_connections--;
         return DONE;
     }else if (buffer_can_read(b)) {
         ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_WRITE);
