@@ -3,6 +3,8 @@
 #include <ctype.h>
 
 #include "parser_utils.h"
+#include "mime_chars.h"
+
 
 const char *
 parser_utils_strcmpi_event(const enum string_cmp_event_types type) {
@@ -136,9 +138,98 @@ parser_utils_strcmpi(const char *s) {
     return def;
 }
 
+/* Version especial de parser_utils_strcmpi que ignora LWSP iniciales */
+struct parser_definition
+parser_utils_strcmpi_ignore_lwsp(const char *s) {
+    const size_t n = strlen(s);
+
+    struct parser_state_transition **states     = calloc(n + 3, sizeof(*states));
+    size_t *nstates                             = calloc(n + 3, sizeof(*nstates));
+    struct parser_state_transition *transitions = calloc(3 * (n + 3),
+                                                         sizeof(*transitions));
+    if(states == NULL || nstates == NULL || transitions == NULL) {
+        free(states);
+        free(nstates);
+        free(transitions);
+
+        struct parser_definition def = {
+                .start_state   = 0,
+                .states_count  = 0,
+                .states        = NULL,
+                .states_n      = NULL,
+        };
+        return def;
+    }
+
+    // estados fijos
+    const size_t st_eq  = n;
+    const size_t st_neq = n + 1;
+
+    // START
+    transitions[0 * 3 + 0].when = TOKEN_LWSP;
+    transitions[0 * 3 + 0].dest = 0;
+    transitions[0 * 3 + 0].act1 = may_eq;
+    transitions[0 * 3 + 1].when = tolower(s[0]);
+    transitions[0 * 3 + 1].dest = 2;
+    transitions[0 * 3 + 1].act1 = 0 + 1 == n ? eq : may_eq;
+    transitions[0 * 3 + 2].when = toupper(s[0]);
+    transitions[0 * 3 + 2].dest = 1;
+    transitions[0 * 3 + 2].act1 = 0 + 1 == n ? eq : may_eq;
+    transitions[0 * 3 + 3].when = ANY;
+    transitions[0 * 3 + 3].dest = st_neq;
+    transitions[0 * 3 + 3].act1 = neq;
+    states     [0]              = transitions + (0 * 3 + 0);
+    nstates    [0]              = 4;
+
+    for(size_t i = 0; i < n; i++) {
+        const size_t dest = (i + 2 == n) ? st_eq : i + 2;
+
+        transitions[(i+1) * 3 + 0].when = tolower(s[i]);
+        transitions[(i+1) * 3 + 0].dest = dest;
+        transitions[(i+1) * 3 + 0].act1 = i + 1 == n ? eq : may_eq;
+        transitions[(i+1) * 3 + 1].when = toupper(s[i]);
+        transitions[(i+1) * 3 + 1].dest = dest;
+        transitions[(i+1) * 3 + 1].act1 = i + 1 == n ? eq : may_eq;
+        transitions[(i+1) * 3 + 2].when = ANY;
+        transitions[(i+1) * 3 + 2].dest = st_neq;
+        transitions[(i+1) * 3 + 2].act1 = neq;
+        states     [(i+1)]              = transitions + ((i+1) * 3 + 0);
+        nstates    [(i+1)]              = 3;
+    }
+    // EQ
+    transitions[(n + 1) * 3].when   = ANY;
+    transitions[(n + 1) * 3].dest   = st_neq;
+    transitions[(n + 1) * 3].act1   = neq;
+    states     [(n + 1)]            = transitions + ((n + 1) * 3 + 0);
+    nstates    [(n + 1)]            = 1;
+    // NEQ
+    transitions[(n + 2) * 3].when   = ANY;
+    transitions[(n + 2) * 3].dest   = st_neq;
+    transitions[(n + 2) * 3].act1   = neq;
+    states     [(n + 2)]            = transitions + ((n + 2) * 3 + 0);
+    nstates    [(n + 2)]            = 1;
+
+
+    struct parser_definition def = {
+            .start_state   = 0,
+            .states_count  = n + 3,
+            .states        = (struct parser_state_transition **) states,
+            .states_n      = (size_t *) nstates,
+    };
+
+    return def;
+}
+
 void
 parser_utils_strcmpi_destroy(const struct parser_definition *p) {
     free((void *)p->states[0]);
     free((void *)p->states);
     free((void *)p->states_n);
+}
+
+void append(char* s, char c)
+{
+    int len = strlen(s);
+    s[len] = c;
+    s[len+1] = '\0';
 }

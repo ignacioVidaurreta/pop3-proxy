@@ -2,11 +2,16 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdbool.h>
+#include <string.h>
+#include <ctype.h>
+#include <strings.h>
 
 #include "parser_utils.h"
 #include "pop3_multi.h"
 #include "mime_chars.h"
 #include "mime_msg.h"
+#include "mime_value.h"
+#include "mime_boundary_key.h"
 
 /*
  * imprime información de debuging sobre un evento.
@@ -121,7 +126,7 @@ bool is_blocked_type(struct ctx *ctx) {
             break;
         }
     }
-    if(eq && strlen(black) == strlen(ctx->content_type)) {
+    if(eq && strlen(blocked_type) == strlen(ctx->content_type)) {
         return true;
     }
     return false;
@@ -138,7 +143,7 @@ bool is_multipart(char *content_type) {
 }
 
 bool is_message(char *content_type) {
-    return strcmp(tolower(content_type[j]), "message/rfc822") == 0;
+    return strcasecmp(content_type, "message/rfc822") == 0;
 }
 
 /* Detecta si un header-field-name equivale a Content-Type.
@@ -174,13 +179,13 @@ content_type_value(struct ctx *ctx, const uint8_t c) {
         debug("2.    ctypeval", mime_value_event, e);
         switch(e->type) {
             case VALUE:
-                nappend(ctx->content_type, c, MAX_STRING_LENGTH);
+                append(ctx->content_type, c);
                 ctx->msg_content_type_value_stored = NULL;
                 break;
             case VALUE_END:
                 fprintf(stderr, "ctype: %s\n",ctx->content_type);
                 ctx->msg_content_type_value_stored = &T;
-                if(to_is_blocked_type(ctx)) {
+                if(is_blocked_type(ctx)) {
                     printf(": text/plain");
                     ctx->filter_curr_mime = &T;
                 } else {
@@ -194,6 +199,53 @@ content_type_value(struct ctx *ctx, const uint8_t c) {
                 break;
             case UNEXPECTED:
                 ctx->msg_content_type_value_stored = &F;
+                break;
+        }
+        e = e->next;
+    } while (e != NULL);
+}
+
+/* Detecta si un valor en content-type equivale a "boundary=".
+ * Deja el valor en `ctx->msg_boundary_name_detected'. Tres valores
+ * posibles: NULL (no tenemos información suficiente todavia),
+ * true si matchea, false si no matchea.
+ */
+static void
+boundary_name(struct ctx *ctx, const uint8_t c) {
+    const struct parser_event* e = parser_feed(ctx->boundary_name, c);
+    do {
+        debug("2.   boun_name", parser_utils_strcmpi_event, e);
+        switch(e->type) {
+            case STRING_CMP_EQ:
+                ctx->msg_boundary_name_detected = &T;
+                break;
+            case STRING_CMP_NEQ:
+                ctx->msg_boundary_name_detected = &F;
+                break;
+        }
+        e = e->next;
+    } while (e != NULL);
+}
+
+/**
+ * Guarda un boundary key.
+ * El valor se guarda en ctx->boundaries[ctx->boundaries_n]
+ */
+static void
+boundary_key(struct ctx *ctx, const uint8_t c) {
+    const struct parser_event* e = parser_feed(ctx->boundary_key, c);
+    do {
+        debug("2.boundary_key", mime_boundary_key_event, e);
+        switch(e->type) {
+            case BOUNDARY_KEY_VALUE:
+                append(ctx->boundaries[ctx->boundaries_n], c);
+                break;
+            case BOUNDARY_KEY_VALUE_END:
+                fprintf(stderr, "boundary: %s\n",ctx->boundaries[ctx->boundaries_n]);
+                ctx->boundaries_n++;
+                ctx->msg_boundary_key_stored = &T;
+                break;
+            case BOUNDARY_KEY_UNEXPECTED:
                 break;
         }
         e = e->next;
@@ -227,11 +279,11 @@ mime_msg(struct ctx *ctx, const uint8_t c) {
             case MIME_MSG_NAME_END:
                 // lo dejamos listo para el próximo header
                 parser_reset(ctx->ctype_header);
-                //ctx->msg_content_type_field_detected = NULL;
-                // if (ctx->msg_content_type_field_detected != NULL
-                //  && *ctx->msg_content_type_field_detected){
-                //     ctx->print_curr_char = &F;
-                //  }
+                ctx->msg_content_type_field_detected = NULL;
+//                 if (ctx->msg_content_type_field_detected != NULL
+//                  && *ctx->msg_content_type_field_detected){
+//                     ctx->print_curr_char = &F;
+//                  }
                 break;
             case MIME_MSG_VALUE:
                 if(ctx->msg_content_type_field_detected != 0
@@ -253,6 +305,8 @@ mime_msg(struct ctx *ctx, const uint8_t c) {
                         }
                     }
                 }
+                break;
+            case MIME_MSG_VALUE_FOLD:
                 break;
             case MIME_MSG_VALUE_END:
                 // si parseabamos Content-Type ya terminamos
@@ -285,6 +339,7 @@ pop3_multi(struct ctx *ctx, const uint8_t c) {
                 break;
         }
         e = e->next;
+//        getchar();
     } while (e != NULL);
 }
 
