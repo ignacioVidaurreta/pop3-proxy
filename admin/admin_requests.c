@@ -56,3 +56,30 @@ bool handle_password(char * password, int conn_sock){
     
     return res[0] == 0;
 }
+
+void print_commands(){
+    printf("Hello World\n");
+}
+
+void get_concurrent_connections(int conn_sock){
+    uint8_t command = 0x02, nargs = 0;
+    int ret;
+    uint8_t datagram[MAX_DATAGRAM_SIZE];
+    uint8_t res[MAX_DATAGRAM_SIZE];
+    datagram[0] = command;
+    datagram[1] = nargs;
+    ret = sctp_sendmsg(conn_sock, (const void *) datagram, 2,
+                       NULL, 0, 0, 0, STREAM, 0, 0);
+    ret = sctp_recvmsg(conn_sock, (void *) res, MAX_DATAGRAM_SIZE,
+                       (struct sockaddr *) NULL, 0, 0, 0);
+    if (res[0] == 0) {
+        char data[res[1] + 1];
+        memcpy(data, res + 2, res[1]);
+        data[res[1]] = '\0';
+        printf("Concurrent connections: %s \n", data);
+    } else {
+        //perror(res[0]);
+        printf("NOOPE \n");
+    }
+    return 1;
+}

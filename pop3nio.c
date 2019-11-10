@@ -10,6 +10,7 @@
 #include <sys/wait.h>
 #include <pthread.h>
 #include <poll.h>
+#include <metrics.h>
 
 #include "include/buffer.h"
 #include "include/stm.h"
@@ -76,7 +77,7 @@ pop3_new(int client_fd){
     buffer_init(&ret->request_buffer, N(ret->raw_buff_c), ret->raw_buff_c);
     buffer_init(&ret->cmd_request_buffer, N(ret->raw_buff_d), ret->raw_buff_d);
 
-    //TODO: INCREMENTAR CANTIDAD DE CONEXIONES CONCURRENTES, 
+    metrics->concurrent_connections++;
     //TODAVIA NO TENEMOS LA STRUCT GLOBAL METRICS REFERENCIADA EN ESTE ARCHIVO
 
     ret->references = 1;
