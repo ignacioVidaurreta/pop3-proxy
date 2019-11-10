@@ -202,3 +202,9 @@ void update_config(const int argc, char* const* argv){
         */
     set_origin_server("0.0.0.0");
 }
+
+void free_config(){
+    free(options->replacement_message);
+    free(options->cmd);
+    free(options);
+}

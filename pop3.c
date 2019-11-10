@@ -202,4 +202,6 @@ int serve_POP3_concurrent_blocking(const int server){
 
 void free_resources() {
     free(state);
+    free_config();
+    free_metrics();
 }

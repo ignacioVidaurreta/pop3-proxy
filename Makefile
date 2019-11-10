@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -pthread -std=c99 -pedantic -Wall -fsanitize=address -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE -ggdb3 
+CFLAGS = -pthread -std=c99 -pedantic -Wall -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE -ggdb3 
 GREEN = \e[92m
 NORMAL = \e[0m
 FILES=./*.c
@@ -13,6 +13,9 @@ strict:
 	@echo "$(GREEN)Compiling in STRICT mode ...$(NORMAL)"
 	$(CC) $(CFLAGS) -Werror $(FILES) -o $(EXEC_NAME)
 	@echo "$(GREEN)Done!$(NORMAL)"
+
+sanitized:
+	$(CC) $(CFLAGS) -fsanitize=address -static-libasan $(FILES) -o $(EXEC_NAME) -lsctp
 
 debug:
 	@echo "$(GREEN)Compiling in debug mode ...$(NORMAL)"
@@ -40,5 +43,5 @@ gdb: debug
 	gdb $(EXEC_NAME)_debug
 
 valgrind: all
-	valgrind --leak-check=yes ./$(EXEC_NAME)
+	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./$(EXEC_NAME)
 

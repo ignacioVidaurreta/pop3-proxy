@@ -54,5 +54,6 @@ void change_error_file(char *filename);
 void replace_string(char *previous, char *new);
 void update_config(const int argc, char* const* argv);
 in_port_t* expose_port(struct sockaddr* address);
+void free_config();
 
 #endif /* CONFIG_H */ 
