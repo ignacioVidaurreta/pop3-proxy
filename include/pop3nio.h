@@ -183,6 +183,7 @@ struct pop3 {
 void pop3filter_passive_accept();
 void pop3_destroy(struct pop3 *state);
 void assign_cmd(struct selector_key *key, char *cmd, int cmds_read);
+void free_resources();
 
 
 
