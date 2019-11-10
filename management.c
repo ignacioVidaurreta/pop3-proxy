@@ -432,6 +432,25 @@ size_t write_response_with_args(buffer* b, uint8_t status, char* data, size_t da
     return data_len + 2;
 }
 
+static unsigned get_transferred_bytes(struct buffer* b, enum response_status * status){
+    unsigned long data = metrics->transfered_bytes;
+
+    int digits = 0;
+    unsigned long aux = data;
+    while(aux != 0){
+        aux /= 10;
+        digits++;
+    }
+    char serialized_data[digits+1];
+    sprintf(serialized_data, "%lu", data);
+
+    *status = CMD_SUCCESS;
+    if(write_response_with_args(b, 0x00, serialized_data, strlen(serialized_data)) == -1){
+        return ERROR;
+    }
+    return RESPOND_COMMAND;
+}
+
 static unsigned get_concurrent_connections(struct buffer* b, enum response_status *status){
     int data = metrics->concurrent_connections;
 
@@ -468,6 +487,9 @@ static unsigned process_command(struct selector_key* key){
     switch(request->cmd){
         case CONCURR_CONNECTIONS:
             ret = get_concurrent_connections(&management->write_buffer, &management->status);
+            break;
+        case TRANSFERRED_BYTES:
+            ret = get_transferred_bytes(&management->write_buffer, &management->status);
             break;
         default:
             management->status = INVALID_CMD;

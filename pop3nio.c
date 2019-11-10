@@ -227,7 +227,6 @@ static unsigned response_read(struct selector_key *key){
     n = recv(key->fd, ptr, count, 0);
 
     if(n > 0) {
-        //TODO: Multiline parse email (connect with old one)
         buffer_write_adv(b, n);
         selector_status ss = SELECTOR_SUCCESS;
         ss |= selector_set_interest_key(key, OP_NOOP);
@@ -290,7 +289,6 @@ static unsigned response_write(struct selector_key *key){
 
     n = send_to_server(key, b);
 
-    //TODO: QUIT
     if (n == -1) {
         ret = ERROR;
     } else if (n == 0) {

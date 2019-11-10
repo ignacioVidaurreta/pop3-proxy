@@ -187,6 +187,14 @@ int main(int argc, char* const* argv){
                 ended = true;
             }else if(strcmp(buffer, "connections\n") == 0){
                 get_concurrent_connections(conn_sock);
+            }else if(strcmp(buffer, "get_transformation\n") == 0){
+                //get_active_transformation(conn_sock);
+            }else if(strcmp(buffer, "set_transformation\n") == 0){
+                //set_transformation(conn_sock);
+            }else if(strcmp(buffer, "bytes\n") == 0){
+                get_transferred_bytes(conn_sock);
+            }else{
+                printf("Invalid command. Type 'help' to get more information\n");
             }
         }
     }

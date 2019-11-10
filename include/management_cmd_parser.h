@@ -10,7 +10,8 @@ enum request_CMD {
     PASS                        = 0x01,
     CONCURR_CONNECTIONS         = 0x02,
     SET_TRANSFORMATION          = 0x03,
-    QUIT                        = 0x04
+    TRANSFERRED_BYTES           = 0x04,
+    QUIT                        = 0x05
 };
 
 struct request_structure {
