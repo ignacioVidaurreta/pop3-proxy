@@ -14,6 +14,9 @@
 #include <limits.h>
 #include <errno.h>
 
+#include "include/admin_requests.h"
+#include "include/admin.h"
+
 #define DEFAULT_PORT 9090
 #define DEFAULT_ADDRESS "127.0.0.1"
 #define BUFFER 2048
@@ -121,7 +124,7 @@ int main(int argc, char* const* argv){
 
     struct addrinfo *addr;
     if(!resolve_address(address, port, &addr)) {
-        perror("Unable to resolve address");
+        perror("Unable to resolve address\n");
         exit(1);
     }
 
@@ -141,42 +144,52 @@ int main(int argc, char* const* argv){
 
     printf("\t\tPlease login\t\t\n");
     int ended = 0;
-    while(!ended){
-        bool user_logged = false;
-        bool reading_username = true;
-        bool reading_password = true;
-        while(!user_logged){
-            int success;
-            printf("Enter username: \n");
-            while(reading_username){
-                memset(buffer, 0, sizeof(buffer));
-                if(fgets(buffer, sizeof(buffer), stdin) != NULL){
-                    success = handle_user(buffer, conn_sock);
-                    if(success)
-                        reading_username = false;
-                    else
-                        printf("Invalid username! Please try again\n");
-                }
+    bool user_logged = false;
+    bool reading_username = true;
+    bool reading_password = true;
+    while(!user_logged){
+        int success;
+        printf("Enter username: \n");
+        while(reading_username){
+            memset(buffer, 0, sizeof(buffer));
+            if(fgets(buffer, sizeof(buffer), stdin) != NULL){
+                success = handle_user(buffer, conn_sock);
+                if(success)
+                    reading_username = false;
+                else
+                    printf("Invalid username! Please try again\n");
             }
-            printf("Enter password: \n");
-            while(reading_password){
-                memset(buffer, 0, sizeof(buffer));
-                if(fgets(buffer, sizeof(buffer), stdin) != NULL){
-                    success = handle_password(buffer, conn_sock);
-                    if(success){
-                        reading_password = false;
-                        printf("Logged In successfully!");
-                    }
-                    else{
-                        printf("Invalid password! Please try again\n");
-                    }
-                }
-            }
-            user_logged = true;
         }
-        ended=1;
+        printf("Enter password: \n");
+        while(reading_password){
+            memset(buffer, 0, sizeof(buffer));
+            if(fgets(buffer, sizeof(buffer), stdin) != NULL){
+                success = handle_password(buffer, conn_sock);
+                if(success){
+                    reading_password = false;
+                    printf("Logged In successfully!\n");
+                }
+                else{
+                    printf("Invalid password! Please try again\n");
+                }
+            }
+        }
+        user_logged = true;
     }
-
+    printf("\n\t\tAuthenticated succesfully.\n\t\t\tWelcome admin\n");
+    while(!ended){
+        printf("Enter your command> ");
+        memset(buffer, 0, sizeof(buffer));
+        if(fgets(buffer, sizeof(buffer), stdin) != NULL){
+            if(strcmp(buffer, "help\n") == 0){
+                print_commands();
+            }else if(strcmp(buffer, "quit\n") == 0){
+                ended = true;
+            }else if(strcmp(buffer, "connections\n") == 0){
+                get_concurrent_connections(conn_sock);
+            }
+        }
+    }
     free(addr);
 
 

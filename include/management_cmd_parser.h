@@ -6,11 +6,11 @@
 
 
 enum request_CMD {
-    USER                = 0x00,
-    PASS                = 0x01,
-    GET_METRICS         = 0x02,
-    SET_TRANSFORMATION  = 0x03,
-    QUIT                = 0x04
+    USER                        = 0x00,
+    PASS                        = 0x01,
+    CONCURR_CONNECTIONS         = 0x02,
+    SET_TRANSFORMATION          = 0x03,
+    QUIT                        = 0x04
 };
 
 struct request_structure {

@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -pthread -std=c99 -pedantic -Wall -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE 
+CFLAGS = -pthread -std=c99 -pedantic -Wall -fsanitize=address -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE 
 GREEN = \e[92m
 NORMAL = \e[0m
 FILES=./*.c
