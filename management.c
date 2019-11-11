@@ -15,15 +15,8 @@
 #include "include/management.h"
 #include "include/selector.h"
 #include "include/management_cmd_parser.h"
-
-/*
-1     Byte = Command: 0=USER
-                  1=PASS
-                  2=METRICS
-                  3=SETFILTER
-2     Byte = Length: 0-256
-3-... ByteContent(optional)
-*/
+#include "include/config.h"
+#include "include/logger.h"
 
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
@@ -33,6 +26,7 @@ struct sctp_sndrcvinfo sndrcvinfo;
 int sctp_flags;
 
 extern struct metrics_manager *metrics;
+extern struct config* options;
 
 enum management_state {
   READING_USER,
@@ -432,6 +426,37 @@ size_t write_response_with_args(buffer* b, uint8_t status, char* data, size_t da
     return data_len + 2;
 }
 
+unsigned set_transformation(struct buffer* b, struct request_structure * request, enum response_status *status){
+    *status = CMD_SUCCESS;
+
+    char new_command[request->arg0_size +1];
+    memcpy(new_command, request->arg0, request->arg0_size);
+    new_command[request->arg0_size] = '\0';
+
+    if(strcmp(new_command, "") == 0){
+        options->cmd = NULL;
+    } else {
+        replace_string(options->cmd , new_command);
+    }
+
+    if(write_response_no_args(b, *status) == -1){
+        print_error("Error sending transformation update", get_time());
+        return ERROR;
+    }
+
+    return RESPOND_COMMAND;
+}
+
+unsigned get_transformation(struct buffer* b, enum response_status *status){
+    *status = CMD_SUCCESS;
+
+    if(write_response_with_args(b, 0x00, options->cmd, strlen(options->cmd)) == -1){
+        print_error("Error send transformation", get_time());
+        return ERROR;
+    }
+    return RESPOND_COMMAND;
+}
+
 static unsigned get_transferred_bytes(struct buffer* b, enum response_status * status){
     unsigned long data = metrics->transfered_bytes;
 
@@ -490,6 +515,12 @@ static unsigned process_command(struct selector_key* key){
             break;
         case TRANSFERRED_BYTES:
             ret = get_transferred_bytes(&management->write_buffer, &management->status);
+            break;
+        case GET_TRANSFORMATION:
+            ret = get_transformation(&management->write_buffer, &management->status);
+            break;
+        case SET_TRANSFORMATION:
+            ret = set_transformation(&management->write_buffer, request, &management->status);
             break;
         default:
             management->status = INVALID_CMD;

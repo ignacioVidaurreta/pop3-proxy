@@ -104,6 +104,49 @@ void send_msg_no_arguments(int conn_sock, char* fmt, uint8_t command, uint8_t na
     }
 }
 
+void set_active_transformation(int conn_sock){
+//    send_msg_no_arguments(conn_sock, "Transformation changed from %s", 0x04, 0);
+//    char* format_msg = "to %s"
+    uint8_t arg_size = 0;
+    int exit = 1;
+    uint8_t command = 0x03, nargs = 1;
+    int ret;
+    uint8_t datagram[MAX_DATAGRAM_SIZE];
+    uint8_t res[MAX_DATAGRAM_SIZE];
+    char buffer[256];
+    datagram[0] = command;
+    datagram[1] = nargs;
+
+    while (exit) {
+        printf(" Enter new transformation command \n");
+        exit = fgets(buffer, 255, stdin) == NULL;
+        arg_size = (uint8_t)(strlen(buffer) - 1);
+        if (exit) {
+            printf(" No characters read \n");
+        } else {
+            datagram[2] = arg_size;
+            memcpy(datagram + 3, buffer, arg_size);
+        }
+    }
+    ret = sctp_sendmsg(conn_sock, (const void *) datagram, arg_size + 3,
+                        NULL, 0, 0, 0, STREAM, 0, 0);
+    ret = sctp_recvmsg(conn_sock, (void *) res, MAX_DATAGRAM_SIZE,
+                        (struct sockaddr *) NULL, 0, 0, 0);
+    if (res[0] == 0x00) {
+        printf("Transformation set \n");
+    } else {
+        print_error_msg(res[0]);
+    }
+    return 0;
+
+}
+
+void get_active_transformation(int conn_sock){
+    char* format_msg = "Current transformation: %s \n";
+    uint8_t command = 0x04, nargs = 0;
+    send_msg_no_arguments(conn_sock, format_msg, command, nargs);
+}
+
 void get_concurrent_connections(int conn_sock){
     char* format_msg = "Concurrent connections: %s \n";
     uint8_t command = 0x02, nargs = 0;

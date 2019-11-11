@@ -26,7 +26,7 @@ struct metrics_manager * metrics;
 
 static void
 sigterm_handler(const int signal) {
-    printf("signal %d, cleaning up and exiting\n",signal);
+    printf("signal %d catched: Cleaning up and exiting\n",signal);
     done = true;
 }
 
@@ -37,6 +37,10 @@ int main(const int argc, char* const* argv) {
 
     update_config(argc, argv);
 
+    if(options->local_port == options->origin_port){
+        print_error("Error: origin server can't be the same as proxy server", get_time());
+        return 0;
+    }
     // no tenemos nada que leer de stdin
     close(0);
 
@@ -183,7 +187,6 @@ finally:
 
     selector_close();
     free_resources();
-    // TODO(@team): pop3filter_pool_destroy();
 
     if(server >= 0) {
         close(server);

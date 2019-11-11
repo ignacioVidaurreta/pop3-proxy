@@ -3,6 +3,7 @@
 
 CuSuite* ConfigUtilGetSuite();
 CuSuite* ParserUtilGetSuite();
+CuSuite* LinkedListUtilGetSuite();
 
 
 void RunAllTests(void){

@@ -240,7 +240,6 @@ static unsigned response_read(struct selector_key *key){
 
     if(ret == ERROR) {
         perror("Error reading file");
-        //print_error_message_with_client_ip(ATTACHMENT(key)->client_addr, "error reading response from origin server");
     }
 
     return ret;
@@ -381,7 +380,8 @@ static void pop3_done(struct selector_key* key) {
     for(unsigned i = 0; i < N(fds); i++) {
         if(fds[i] != -1) {
             if(selector_unregister_fd(key->s, fds[i]) != SELECTOR_SUCCESS ) {
-                abort();
+                print_error("Connection refused. No origin service running", get_time());
+                exit(0);
             }
             close(fds[i]);
         }

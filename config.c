@@ -15,7 +15,7 @@ struct config* options;
  *  Initialize configuration structure with default values
  */
 void initialize_config(){
-    options = malloc(sizeof(*options)); //TODO: free in right place
+    options = malloc(sizeof(*options));
 
     options->local_port      = 1110;
     options->origin_port     = 110;
@@ -39,15 +39,14 @@ void initialize_config(){
 	((struct sockaddr_in*) &options->management_address)->sin_addr.s_addr = htonl(INADDR_ANY);
     ((struct sockaddr_in*) &options->management_address)->sin_port        = htons(options->local_port);
 
+    options->string_management_address = calloc(20, sizeof(char));
+    options->string_management_address = calloc(20, sizeof(char));
+
     options->cmd = malloc(CAT_SIZE*sizeof(char));
     memcpy(options->cmd, "cat", CAT_SIZE);
 
-    /* TODO: Too advanced for the current state of the project
-        -> Managment Address
-        -> media-types-censurables
-        -> cmd
-    */
-
+    options->media_types = malloc(20 * sizeof(char));
+    strcpy(options->media_types, "text/html");
 }
 
 void print_usage(char *cmd_name){
@@ -72,8 +71,8 @@ in_port_t get_port_number(char* port){
 
     char *end = 0;
     const long sl = strtol(port, &end, 10);
-    
     if (end == port|| '\0' != *end
+    
           || ((LONG_MIN == sl || LONG_MAX == sl) && ERANGE == errno)
           || sl < 0 || sl > USHRT_MAX) {
            fprintf(stderr, "port should be an integer: %s\n", port);
@@ -142,6 +141,26 @@ in_port_t* expose_port(struct sockaddr* address){
 void set_origin_server(char* address){
     options->origin_server = address;
 }
+
+void set_management_address(char* address){
+    if(inet_pton(AF_INET, address, &(((struct sockaddr_in*) &options->management_address)->sin_addr.s_addr))){
+        ((struct sockaddr_in*)&options->management_address)->sin_family = AF_INET;
+    }else if(inet_pton(AF_INET6, address, &(((struct sockaddr_in6*) &options->management_address)->sin6_addr.s6_addr))){
+        ((struct sockaddr_in6*)&options->management_address)->sin6_family = AF_INET6;
+    }else{
+        ((struct sockaddr_in6*)&options->management_address)->sin6_family = AF_UNSPEC;
+    }
+}
+
+void set_proxy_address(char* address){
+    if(inet_pton(AF_INET, address, &(((struct sockaddr_in*) &options->proxy_address)->sin_addr.s_addr))){
+        ((struct sockaddr_in*)&options->proxy_address)->sin_family = AF_INET;
+    }else if(inet_pton(AF_INET6, address, &(((struct sockaddr_in6*) &options->proxy_address)->sin6_addr.s6_addr))){
+        ((struct sockaddr_in6*)&options->proxy_address)->sin6_family = AF_INET6;
+    }else{
+        ((struct sockaddr_in6*)&options->proxy_address)->sin6_family = AF_UNSPEC;
+    }
+}
 /**
  *  Parse command line arguments to update configuration.
  */
@@ -176,16 +195,16 @@ void update_config(const int argc, char* const* argv){
                 exit(0);
                 break;
             case 'l':
-                fprintf(stdout, "WIP");
+                set_proxy_address(optarg);
                 break;
             case 'L':
-                fprintf(stdout, "WIP");
+                set_management_address(optarg);
                 break;
             case 'm':
-                replace_string(options->replacement_message, optarg); //TODO(Nachito): Test this
+                replace_string(options->replacement_message, optarg);
                 break;
             case 'M':
-                fprintf(stdout, "WIP");
+                replace_string(options->media_types, optarg);
                 break;
             case 't':
                 setCommand(options->cmd, optarg);
@@ -193,18 +212,17 @@ void update_config(const int argc, char* const* argv){
         }
     }
 
-    /* TODO(NACHITO): Que esto funque
     if (argv[optind] == NULL) {
         print_usage(argv[0]);
         exit(0);
     }else
         set_origin_server(argv[optind]);
-        */
-    set_origin_server("0.0.0.0");
 }
 
 void free_config(){
     free(options->replacement_message);
+    free(options->string_management_address);
+    free(options->string_proxy_address);
     free(options->cmd);
     free(options);
 }
