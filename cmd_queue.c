@@ -19,6 +19,7 @@ int add_element(queue* list, void* value){
         return 1;
     }
 
+    list->size++;
     return add_elementR(list->first, value);
     
 }
