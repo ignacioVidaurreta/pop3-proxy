@@ -4,6 +4,7 @@
 #include <sys/socket.h> 
 #include "stm.h"
 #include "buffer.h"
+#include "cmd_queue.h"
 
 struct response_st {
     buffer                  *wb, *rb;
@@ -153,6 +154,7 @@ struct pop3 {
     /** estados para el client_fd */
     union {
         struct request_st         request;
+        queue *                   requests;
         // struct error_st           error;
     } client;
 
