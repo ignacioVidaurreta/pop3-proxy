@@ -188,7 +188,7 @@ int main(int argc, char* const* argv){
             }else if(strcmp(buffer, "connections\n") == 0){
                 get_concurrent_connections(conn_sock);
             }else if(strcmp(buffer, "get_transformation\n") == 0){
-                //get_active_transformation(conn_sock);
+                get_active_transformation(conn_sock);
             }else if(strcmp(buffer, "set_transformation\n") == 0){
                 //set_transformation(conn_sock);
             }else if(strcmp(buffer, "bytes\n") == 0){

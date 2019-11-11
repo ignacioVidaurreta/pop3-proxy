@@ -15,7 +15,7 @@ struct config* options;
  *  Initialize configuration structure with default values
  */
 void initialize_config(){
-    options = malloc(sizeof(*options)); //TODO: free in right place
+    options = malloc(sizeof(*options));
 
     options->local_port      = 1110;
     options->origin_port     = 110;
@@ -45,12 +45,8 @@ void initialize_config(){
     options->cmd = malloc(CAT_SIZE*sizeof(char));
     memcpy(options->cmd, "cat", CAT_SIZE);
 
-    /* TODO: Too advanced for the current state of the project
-        -> Managment Address
-        -> media-types-censurables
-        -> cmd
-    */
-
+    options->media_types = malloc(20 * sizeof(char));
+    strcpy(options->media_types, "text/html");
 }
 
 void print_usage(char *cmd_name){
@@ -75,8 +71,8 @@ in_port_t get_port_number(char* port){
 
     char *end = 0;
     const long sl = strtol(port, &end, 10);
-    
     if (end == port|| '\0' != *end
+    
           || ((LONG_MIN == sl || LONG_MAX == sl) && ERANGE == errno)
           || sl < 0 || sl > USHRT_MAX) {
            fprintf(stderr, "port should be an integer: %s\n", port);
@@ -205,7 +201,7 @@ void update_config(const int argc, char* const* argv){
                 set_management_address(optarg);
                 break;
             case 'm':
-                replace_string(options->replacement_message, optarg); //TODO(Nachito): Test this
+                replace_string(options->replacement_message, optarg);
                 break;
             case 'M':
                 replace_string(options->media_types, optarg);

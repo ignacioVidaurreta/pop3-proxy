@@ -104,6 +104,12 @@ void send_msg_no_arguments(int conn_sock, char* fmt, uint8_t command, uint8_t na
     }
 }
 
+void get_active_transformation(int conn_sock){
+    char* format_msg = "Current transformation: %s \n";
+    uint8_t command = 0x04, nargs = 0;
+    send_msg_no_arguments(conn_sock, format_msg, command, nargs);
+}
+
 void get_concurrent_connections(int conn_sock){
     char* format_msg = "Concurrent connections: %s \n";
     uint8_t command = 0x02, nargs = 0;
