@@ -1,9 +1,9 @@
 CC = gcc
-CFLAGS = -pthread -std=c99 -pedantic -Wall -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE -ggdb3 
+CFLAGS = -pthread --std=c99 -pedantic -Wall -D_POSIX_C_SOURCE=200112L -D_XOPEN_SOURCE -ggdb3 
 GREEN = \e[92m
 NORMAL = \e[0m
 FILES=./*.c
-EXEC_NAME = run
+EXEC_NAME = pop3filter 
 all: 
 	@echo "$(GREEN)Compiling ...$(NORMAL)"
 	$(CC) $(CFLAGS) $(FILES) -o $(EXEC_NAME) -lsctp

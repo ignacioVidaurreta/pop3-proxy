@@ -239,7 +239,6 @@ static unsigned response_read(struct selector_key *key){
 
     if(ret == ERROR) {
         perror("Error reading file");
-        //print_error_message_with_client_ip(ATTACHMENT(key)->client_addr, "error reading response from origin server");
     }
 
     return ret;

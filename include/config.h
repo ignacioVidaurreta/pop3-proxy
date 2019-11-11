@@ -23,6 +23,10 @@ struct config {
     struct sockaddr_storage proxy_address;
     struct sockaddr_storage management_address;
 
+    /* String representation of ip addresses */
+    char* string_proxy_address;
+    char* string_management_address;
+
     /*  Message that is displayed when a part of the message is
      *  replaced because of a filter    
     */
@@ -35,6 +39,8 @@ struct config {
     char* cmd;
     // Current version of the program
     char *version;
+
+    char* media_types;
 
     /*
      *  This variable defines if when parsing an email, we should parse it in
@@ -51,6 +57,8 @@ void print_usage(char *cmd_name);
 in_port_t get_port_number(char* port);
 void change_port(in_port_t *port, char *port_str);
 void change_error_file(char *filename);
+void set_management_address(char* address);
+void set_proxy_address(char* address);
 void replace_string(char *previous, char *new);
 void update_config(const int argc, char* const* argv);
 in_port_t* expose_port(struct sockaddr* address);

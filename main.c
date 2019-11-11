@@ -26,7 +26,7 @@ struct metrics_manager * metrics;
 
 static void
 sigterm_handler(const int signal) {
-    printf("signal %d, cleaning up and exiting\n",signal);
+    printf("signal %d catched: Cleaning up and exiting\n",signal);
     done = true;
 }
 
@@ -183,7 +183,6 @@ finally:
 
     selector_close();
     free_resources();
-    // TODO(@team): pop3filter_pool_destroy();
 
     if(server >= 0) {
         close(server);
