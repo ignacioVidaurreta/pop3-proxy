@@ -1,29 +1,30 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "CuTest.h"
-#include "../include/linked_list.h"
+
+#include "../include/cmd_queue.h"
 #define N 10000
 
 void test_create_list(CuTest *tc){
-    list_head* list = create_list();
+    list_head* list = create_queue();
 
     CuAssertPtrNotNull(tc, list);
     CuAssertPtrEquals(tc, NULL, list->first);
 }
 
 void test_add_element_list(CuTest *tc){
-    list_head* list = create_list(); // Already tested
+    list_head* list = create_queue(); // Already tested
     int expected_value = 3;
     add_element(list, (void*)&expected_value);
 
     CuAssertPtrNotNull(tc, list->first);
     CuAssertIntEquals(tc, expected_value, *(int*)(list->first->elem));
     CuAssertPtrEquals(tc, NULL, list->first->next);
-    free_list(list);
+    free_queue(list);
 }
 
 void test_add_two_elements_list(CuTest *tc){
-    list_head* list = create_list();
+    list_head* list = create_queue();
     int first_expected = 2;
     int second_expected = 3;
     add_element(list, (void*)&first_expected);
@@ -34,11 +35,11 @@ void test_add_two_elements_list(CuTest *tc){
     CuAssertIntEquals(tc, second_expected, *(int*)(list->first->next->elem));
     CuAssertPtrEquals(tc, NULL, list->first->next->next);
 
-    free_list(list);
+    free_queue(list);
 }
 
 void test_add_n_elements_list(CuTest *tc){
-    list_head* list = create_list();
+    list_head* list = create_queue();
     int expected = 0;
     
     add_element(list, (void*)&expected);
@@ -53,7 +54,7 @@ void test_add_n_elements_list(CuTest *tc){
         CuAssertIntEquals(tc, expected, *(int*)(curr_node->elem)); //Already tested
     }    
 
-    free_list(list);
+    free_queue(list);
 }
 
 CuSuite* LinkedListUtilGetSuite() {

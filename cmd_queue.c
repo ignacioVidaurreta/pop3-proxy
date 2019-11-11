@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "include/linked_list.h"
+#include "include/cmd_queue.h"
 
-list_head* create_list(){
+list_head* create_queue(){
     list_head* list = malloc(sizeof(*list));
     list->first = NULL;
     return list;
@@ -34,7 +34,20 @@ int add_elementR(node* curr_node, void* value){
     return 1;
 }
 
-void free_list(list_head* list){
+void* peek(list_head* list){
+    return list->first;
+}
+
+void* pop(list_head* list){
+    if(list->size == 0) return NULL;
+
+    void* ret = list->first;
+    list->first = list->first->next;
+    list->size--;
+    return ret;
+}
+
+void free_queue(list_head* list){
     free_node(list->first);
     free(list);
 }
