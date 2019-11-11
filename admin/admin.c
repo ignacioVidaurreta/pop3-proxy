@@ -28,7 +28,7 @@ bool resolve_address(char *address, uint16_t port, struct addrinfo ** addrinfo) 
           .ai_family    = AF_UNSPEC,    /* Allow IPv4 or IPv6 */
           .ai_socktype  = SOCK_STREAM,
           .ai_flags     = AI_PASSIVE,   /* For wildcard IP address */
-          .ai_protocol  = 0,            /* Any protocol */
+          .ai_protocol  = IPPROTO_SCTP,            /* Any protocol */
           .ai_canonname = NULL,
           .ai_addr      = NULL,
           .ai_next      = NULL,
@@ -90,7 +90,6 @@ int main(int argc, char* const* argv){
 
     uint16_t port = DEFAULT_PORT;
     char * address = DEFAULT_ADDRESS;
-    char * address_2 = DEFAULT_ADDRESS;
     int opt;
     opterr = 0; //Avoid default error message when falling in ?
     size_t size;
