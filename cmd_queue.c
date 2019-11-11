@@ -2,19 +2,20 @@
 #include <stdlib.h>
 #include "include/cmd_queue.h"
 
-list_head* create_queue(){
-    list_head* list = malloc(sizeof(*list));
+queue* create_queue(){
+    queue* list = malloc(sizeof(*list));
     list->first = NULL;
     return list;
 }
 
-int add_element(list_head* list, void* value){
+int add_element(queue* list, void* value){
     if(list->first == NULL){
         node* aux_node = malloc(sizeof(*aux_node));
         if (aux_node == NULL) return 0; // Memory allocation error
         aux_node->elem = value;
         aux_node->next = NULL;
         list->first = aux_node;
+        list->size++;
         return 1;
     }
 
@@ -34,11 +35,11 @@ int add_elementR(node* curr_node, void* value){
     return 1;
 }
 
-void* peek(list_head* list){
+void* peek(queue* list){
     return list->first;
 }
 
-void* pop(list_head* list){
+void* pop(queue* list){
     if(list->size == 0) return NULL;
 
     void* ret = list->first;
@@ -47,7 +48,7 @@ void* pop(list_head* list){
     return ret;
 }
 
-void free_queue(list_head* list){
+void free_queue(queue* list){
     free_node(list->first);
     free(list);
 }
