@@ -309,6 +309,10 @@ static unsigned response_write(struct selector_key *key){
                     free(aux);
                     ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_WRITE);
                     ret = ss == SELECTOR_SUCCESS ? RESPONSE : ERROR;
+                } else {
+                    ATTACHMENT(key)->client.request.last_cmd_type = NULL;
+                    ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_WRITE);
+                    ret = SELECTOR_SUCCESS == ss ? REQUEST : ERROR;
                 }
             }else{
                 selector_status ss = SELECTOR_SUCCESS;
