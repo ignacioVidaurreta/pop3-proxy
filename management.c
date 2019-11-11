@@ -426,6 +426,27 @@ size_t write_response_with_args(buffer* b, uint8_t status, char* data, size_t da
     return data_len + 2;
 }
 
+unsigned set_transformation(struct buffer* b, struct request_structure * request, enum response_status *status){
+    *status = CMD_SUCCESS;
+
+    char new_command[request->arg0_size +1];
+    memcpy(new_command, request->arg0, request->arg0_size);
+    new_command[request->arg0_size] = '\0';
+
+    if(strcmp(new_command, "") == 0){
+        options->cmd = NULL;
+    } else {
+        replace_string(options->cmd , new_command);
+    }
+
+    if(write_response_no_args(b, *status) == -1){
+        print_error("Error sending transformation update", get_time());
+        return ERROR;
+    }
+
+    return RESPOND_COMMAND;
+}
+
 unsigned get_transformation(struct buffer* b, enum response_status *status){
     *status = CMD_SUCCESS;
 
@@ -497,6 +518,9 @@ static unsigned process_command(struct selector_key* key){
             break;
         case GET_TRANSFORMATION:
             ret = get_transformation(&management->write_buffer, &management->status);
+            break;
+        case SET_TRANSFORMATION:
+            ret = set_transformation(&management->write_buffer, request, &management->status);
             break;
         default:
             management->status = INVALID_CMD;
