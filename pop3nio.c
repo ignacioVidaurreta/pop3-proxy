@@ -641,7 +641,7 @@ static ssize_t send_next_request(struct selector_key *key, buffer *b) {
 
 /** Escribe la request en el server */
 static unsigned request_write(struct selector_key *key) {
-    struct request_st *d        = &ATTACHMENT(key)->client.requests.peek();
+    struct request_st *d        = peek(ATTACHMENT(key)->client.requests);
     enum pop3_state ret         = REQUEST;
 
     buffer *b                   = d->buffer;
