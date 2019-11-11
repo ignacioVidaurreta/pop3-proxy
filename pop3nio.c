@@ -359,7 +359,8 @@ static void pop3_done(struct selector_key* key) {
     for(unsigned i = 0; i < N(fds); i++) {
         if(fds[i] != -1) {
             if(selector_unregister_fd(key->s, fds[i]) != SELECTOR_SUCCESS ) {
-                abort();
+                print_error("Connection refused. No origin service running", get_time());
+                exit(0);
             }
             close(fds[i]);
         }
