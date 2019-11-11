@@ -37,6 +37,10 @@ int main(const int argc, char* const* argv) {
 
     update_config(argc, argv);
 
+    if(options->local_port == options->origin_port){
+        print_error("Error: origin server can't be the same as proxy server", get_time());
+        return 0;
+    }
     // no tenemos nada que leer de stdin
     close(0);
 
