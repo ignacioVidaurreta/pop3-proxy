@@ -44,7 +44,7 @@ void* peek(queue* list){
 void* pop(queue* list){
     if(list->size == 0) return NULL;
 
-    void* ret = list->first;
+    void* ret = list->first->elem;
     list->first = list->first->next;
     list->size--;
     return ret;

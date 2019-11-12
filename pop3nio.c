@@ -544,9 +544,8 @@ static void parse_and_queue_commands(struct selector_key *key, buffer *buff, ssi
         return;
 
     while (buffer_can_read(buff) && n > 0) {
-        buffer * aux_buff = malloc(sizeof(*aux_buff));
-        uint8_t raw_buff_aux[BUFFER_MAX_SIZE];
-        buffer_init(aux_buff,  N(raw_buff_aux), raw_buff_aux);
+        uint8_t * aux_cmd = malloc(512);
+        memset(aux_cmd, 0, 512);
         ssize_t aux_n = 0;
         size_t i = 0;
         while (buffer_can_read(buff) && aux_n == 0) {
@@ -555,13 +554,11 @@ static void parse_and_queue_commands(struct selector_key *key, buffer *buff, ssi
             if (c == '\n') {
                 aux_n = i;
             }
-            buffer_write(aux_buff, c);
+           aux_cmd[i-1] = c;
         }
 
         n-=i;
-        struct request_st * aux_request = malloc(sizeof(struct request_st));
-        aux_request->cmd_buffer = aux_buff;
-        add_element(requests,aux_request);
+        add_element(requests,aux_cmd);
     }
 
 }
@@ -599,92 +596,42 @@ static unsigned request_read(struct selector_key *key){
     return ret;
 }
 
-static ssize_t send_next_request(struct selector_key *key, buffer *b) {
-    struct request_st* req = (struct request_st*)peek(ATTACHMENT(key)->requests);
-    buffer *cb            = req->cmd_buffer;
-    uint8_t *cptr;
+static ssize_t send_next_request(struct selector_key *key) {
+    queue * q = ATTACHMENT(key)->requests;
+    uint8_t * request_string = (uint8_t *)peek(q);
+    struct request_st *d = &ATTACHMENT(key)->client.request;
+    buffer *buff            = d->aux_buffer;
+    ssize_t aux_n = 0;
+    size_t i = 0;
 
+    while (aux_n == 0) {
+        i++;
+        char c = request_string[i-1];
+        if (c == '\n') {
+            aux_n = i;
+        }
+        buffer_write(buff, c);
+    }
+
+    uint8_t *cptr;
     size_t count;
     ssize_t n = 0;
-
-//    size_t i = 0;
-
-    if (!buffer_can_read(cb))
+    if (!buffer_can_read(buff))
         return 0;
-
-//    while (buffer_can_read(b) && n == 0) {
-//        i++;
-//        char c = buffer_read(b);
-//        if (c == '\n') {
-//            n = i;
-//        }
-//        buffer_write(cb, c);
-//    }
-//
-//    if (n == 0) {
-//        return 0;
-//    }
-
-    cptr = buffer_read_ptr(cb, &count);
-
-//    int cmd_n;
-//    char cmd[16], arg1[32], arg2[32], extra[5];
-//    char * aux = malloc(count+1);
-//    memcpy(aux, cptr, count);
-//    aux[count] = '\0';
-//    cmd_n = sscanf(aux, "%s %s %s %s", cmd, arg1, arg2, extra);
-//
-//    assign_cmd(key, cmd, cmd_n);
-//
-//    free(aux);
-
-//    if (ATTACHMENT(key)->has_pipelining) {
-//        struct next_request *next = malloc(sizeof(next));
-//        next->cmd_type = ATTACHMENT(key)->client.request.cmd_type;
-//        next->next = NULL;
-//
-//        if (ATTACHMENT(key)->client.request.last_cmd_type == NULL) {
-//            ATTACHMENT(key)->client.request.next_cmd_type = next;
-//            ATTACHMENT(key)->client.request.last_cmd_type = next;
-//        }
-//        else {
-//            ATTACHMENT(key)->client.request.last_cmd_type->next = next;
-//            ATTACHMENT(key)->client.request.last_cmd_type = next;
-//        }
-//
-//        buffer *ab = ATTACHMENT(key)->client.request.aux_buffer;
-//        uint8_t *aptr;
-//        size_t acount;
-//
-//        aptr = buffer_write_ptr(ab, &acount);
-//        memcpy(aptr, cptr, count);
-//        buffer_write_adv(ab, count);
-//
-//    }
-//    else {
-        n = send(ATTACHMENT(key)->origin_fd, cptr, count, MSG_NOSIGNAL);
-//    }
-
-    buffer_reset(cb);//TODO habria que destruir?
+    cptr = buffer_read_ptr(buff, &count);
+    n = send(ATTACHMENT(key)->origin_fd, cptr, count, MSG_NOSIGNAL);
+    buffer_reset(buff);//TODO habria que destruir?
 
     return n;
 }
 
 /** Escribe la request en el server */
 static unsigned request_write(struct selector_key *key) {
-    struct request_st *d        = (struct request_st*)peek(ATTACHMENT(key)->requests);
     enum pop3_state ret         = REQUEST;
 
-    buffer *b                   = d->buffer;
     ssize_t  n;
 
-    uint8_t *cptr;
-
-    size_t count;
-    cptr = buffer_read_ptr(d->cmd_buffer, &count);
-
-
-    n = send(ATTACHMENT(key)->origin_fd, cptr, count, MSG_NOSIGNAL);//send_next_request(key, b);
+    n = send_next_request(key);
 
     if(n == -1) {
         ret = ERROR;
@@ -695,42 +642,11 @@ static unsigned request_write(struct selector_key *key) {
         ret = SELECTOR_SUCCESS == ss ? REQUEST : ERROR;
     }
     else {
-//        // Keep writing until there is no more to write
-//        if (ATTACHMENT(key)->has_pipelining) {
-//            if (buffer_can_read(b)) {
-//                if(selector_set_interest_key(key, OP_WRITE) == SELECTOR_SUCCESS) {
-//                    ret = REQUEST;
-//                } else {
-//                    ret = ERROR;
-//                }
-//            }
-//            else { // IF you can0t read, read from auxiliar buffer
-//                buffer *ab            = d->aux_buffer;
-//                uint8_t *aptr;
-//                size_t  count;
-//
-//                aptr = buffer_read_ptr(ab, &count);
-//                n = send(ATTACHMENT(key)->origin_fd, aptr, count, MSG_NOSIGNAL);
-//                buffer_read_adv(ab, n);
-//
-//                struct next_request *aux = ATTACHMENT(key)->client.request.next_cmd_type;
-//                ATTACHMENT(key)->client.request.cmd_type = aux->cmd_type;
-//                ATTACHMENT(key)->client.request.next_cmd_type = aux->next;
-//                free(aux);
-//                if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_READ)) {
-//                    ret = RESPONSE;
-//                } else {
-//                    ret = ERROR;
-//                }
-//            }
-//        }
-//        else {
             if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_READ)) {
                 ret = RESPONSE;
             } else {
                 ret = ERROR;
             }
-//        }
     }
 
     if(ret == ERROR) {
@@ -827,7 +743,6 @@ static unsigned response_read(struct selector_key *key){
 
     if(ret == ERROR) {
         perror("Error reading file");
-        //print_error_message_with_client_ip(ATTACHMENT(key)->client_addr, "error reading response from origin server");
     }
 
     return ret;
@@ -857,10 +772,6 @@ send_to_server(struct selector_key *key, buffer * b) {
     }
 
     sptr = buffer_read_ptr(sb, &count);
-
-//    if (strncasecmp((char*)sptr, "+OK", 3) != 0) {
-//        ATTACHMENT(key)->client.request.cmd_type = DEFAULT;
-//    }
 
     n = send(ATTACHMENT(key)->client_fd, sptr, count, MSG_NOSIGNAL);
 
@@ -913,7 +824,6 @@ static unsigned response_write(struct selector_key *key){
             }
         }
     }
-
 
     return ret;
 }
