@@ -16,6 +16,7 @@ enum request_cmd_type {
             LIST,
             CAPA,
             TOP,
+            UIDL,
             USER,
             PASS,
             DELE,

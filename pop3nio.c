@@ -764,6 +764,14 @@ void assign_cmd(struct selector_key *key, char *cmd, int cmds_read){
     }   
 }
 
+bool is_multi_line_command(struct request_st* request){
+    return request->cmd_type == RETR ||
+            request->cmd_type == LIST ||
+            request->cmd_type == CAPA ||
+            request->cmd_type == TOP ||
+            request->cmd_type == UIDL;
+}
+
 static void do_nothing(const unsigned state, struct selector_key *key){
     //nothing to do
 }
