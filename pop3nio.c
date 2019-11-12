@@ -667,7 +667,7 @@ static ssize_t send_next_request(struct selector_key *key, buffer *b) {
         n = send(ATTACHMENT(key)->origin_fd, cptr, count, MSG_NOSIGNAL);
 //    }
 
-    buffer_compact(cb);//TODO habria que destruir?
+    buffer_reset(cb);//TODO habria que destruir?
 
     return n;
 }
