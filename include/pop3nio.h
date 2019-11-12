@@ -47,7 +47,7 @@ struct next_request {
 };
 
 struct filter_st {
-    buffer                      *original_buffer, *filtered_mail_buffer;
+    buffer                      *original_mail_buffer, *filtered_mail_buffer;
     struct parser               *multi_parser;
 };
 /** maquina de estados general */
@@ -176,6 +176,11 @@ struct pop3 {
     union {
         struct filter_st          filter;
     } filter;
+
+    int                            write_to_filter_fds[2];
+    int                            read_from_filter_fds[2];
+    bool                           has_filtered_mail;
+    int                            external_process;
 
     /** buffers para ser usados read_buffer, write_buffer.*/
     uint8_t raw_buff_a[BUFFER_MAX_SIZE], raw_buff_b[BUFFER_MAX_SIZE], raw_buff_c[BUFFER_MAX_SIZE], raw_buff_d[BUFFER_MAX_SIZE]; //Si necesitamos más buffers, los podemos agregar aca.

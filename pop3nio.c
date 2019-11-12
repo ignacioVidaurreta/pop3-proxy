@@ -25,6 +25,8 @@
 #include "include/config.h"
 #include "include/client.h"
 #include "include/cmd_queue.h"
+#include "include/transformations.h"
+
 
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
@@ -709,13 +711,23 @@ static void response_init(const unsigned state, struct selector_key *key){
     d->wb = &(ATTACHMENT(key)->write_buffer);
 }
 
-// bool is_retr_command(buffer* cmd_buffer){
-
-// }
+bool is_retr_command(uint8_t* cmd_string){
+    char* retr_string = "retr ";
+    int i;
+    for (i = 0; i < strlen(retr_string); i++){
+        if (tolower(cmd_string[i]) != retr_string[i])
+            return false;
+    }
+    while (i < strlen(cmd_string) && cmd_string[i] != '\0'){
+        if (!isdigit(cmd_string[i++]))
+            return false;
+    }
+    return true;
+}
 
 static unsigned response_read(struct selector_key *key){
     struct response_st *d = &ATTACHMENT(key)->origin.response;
-    //struct request_st *latest_request = (struct request_st*) peek(&ATTACHMENT(key)->requests);
+    uint8_t * latest_request = (uint8_t *)peek(ATTACHMENT(key)->requests);
     enum pop3_state ret      = RESPONSE;
 
     buffer  *b         = d->rb;
@@ -723,23 +735,33 @@ static unsigned response_read(struct selector_key *key){
     size_t  count;
     ssize_t  n;
 
-    // if (is_retr_command(latest_request->cmd_buffer)){
+    // fprintf(stderr, "TU FIEJAAA should be 1:%d\n", is_retr_command("RETR 2"));
+    // fprintf(stderr, "TU FIEJAAA should be 1:%d\n", is_retr_command("RETR 232"));
+    // fprintf(stderr, "TU FIEJAAA should be 0:%d\n", is_retr_command("RETR 2d"));
+    // fprintf(stderr, "TU FIEJAAA should be 0:%d\n", is_retr_command(" RETR 2"));
+    // fprintf(stderr, "TU FIEJAAA should be 0:%d\n", is_retr_command("RET 2"));
+    // fprintf(stderr, "TU FIEJAAA should be 0:%d\n", is_retr_command("RETR2"));
 
-    // }
-
-    ptr = buffer_write_ptr(b, &count);
-    n = recv(key->fd, ptr, count, 0);
-
-    if(n > 0) {
-        buffer_write_adv(b, n);
+    if (is_retr_command(latest_request)){
         selector_status ss = SELECTOR_SUCCESS;
         ss |= selector_set_interest_key(key, OP_NOOP);
-        ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_WRITE);
-        ret = ss == SELECTOR_SUCCESS ? RESPONSE : ERROR;
-
+        ss |= selector_set_interest(key->s, ATTACHMENT(key)->write_to_filter_fds, OP_WRITE);
+        ret = ss == SELECTOR_SUCCESS ? FILTER : ERROR;
     } else {
-        ret = ERROR;
-    }
+        ptr = buffer_write_ptr(b, &count);
+        n = recv(key->fd, ptr, count, 0);
+
+        if(n > 0) {
+            buffer_write_adv(b, n);
+            selector_status ss = SELECTOR_SUCCESS;
+            ss |= selector_set_interest_key(key, OP_NOOP);
+            ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_WRITE);
+            ret = ss == SELECTOR_SUCCESS ? RESPONSE : ERROR;
+
+        } else {
+            ret = ERROR;
+        }
+    } 
 
     if(ret == ERROR) {
         perror("Error reading file");
@@ -835,23 +857,106 @@ void error_print(){
 ///////      RESPONSE      ///////
 
 static void
+start_external_filter_process(struct selector_key *key){
+
+    if(ATTACHMENT(key)->external_process)
+        return;
+    if(pipe(ATTACHMENT(key)->write_to_filter_fds) == -1 || pipe(ATTACHMENT(key)->read_from_filter_fds) == -1) {
+        printf("%s failed to create pipes. %s", TRANSFORMATION_START_ERR_MSG, EXIT_MSG);
+        exit(1);
+    }
+    ATTACHMENT(key)->external_process = fork();
+    if(ATTACHMENT(key)->external_process == -1) {
+        printf("%s failed to start external process. %s", TRANSFORMATION_START_ERR_MSG, EXIT_MSG);
+        exit(1);
+    }
+    else if(ATTACHMENT(key)->external_process == 0) {
+        logger(INFO, "Running transformation on email", get_time());
+        if(dup2(ATTACHMENT(key)->write_to_filter_fds[0], STDIN_FILENO) == -1 || dup2(ATTACHMENT(key)->read_from_filter_fds[1], STDOUT_FILENO) == -1) {
+            printf("%s failed to create pipes. %s", TRANSFORMATION_START_ERR_MSG, EXIT_MSG);
+            exit(1);
+        }
+        execl("/bin/sh", "sh", "-c", options->cmd, NULL);
+    }
+}
+
+static void
 filter_init(const unsigned state, struct selector_key *key) 
 {
     struct filter_st * filter = &ATTACHMENT(key)->filter;
-    filter->original_buffer = &ATTACHMENT(key)->read_buffer;
+    filter->original_mail_buffer = &ATTACHMENT(key)->read_buffer;
     filter->filtered_mail_buffer = &ATTACHMENT(key)->write_buffer;
+    start_external_filter_process(key);
 }
 
 static unsigned
 filter_send(struct selector_key *key) 
 {
+    struct filter_st *d = &ATTACHMENT(key)->filter;
+    enum pop3_state ret;
+
+    buffer  *b         = d->original_mail_buffer;
+    ssize_t  n;
+    //n = send_mail_to_filter(key, b);
+
+    if(n == -1) {
+        ret = ERROR;
+    } 
+    else if (n == 0) {
+        selector_status ss = SELECTOR_SUCCESS;
+        ss |= selector_set_interest_key(key, OP_NOOP);
+        ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_READ);
+        ret = SELECTOR_SUCCESS == ss ? RESPONSE : ERROR;
+    } else {
+        selector_status ss = SELECTOR_SUCCESS;
+        ss |= selector_set_interest_key(key, OP_NOOP);
+        ss |= selector_set_interest(key->s, ATTACHMENT(key)->read_from_filter_fds[0], OP_READ);
+        ret = ss == SELECTOR_SUCCESS ? FILTER : ERROR;
+    }
+    
+    return ret;
 
 }
 
 static unsigned
 filter_recv(struct selector_key *key) 
 {
+    //struct filter_st *d = &ATTACHMENT(key)->filter;
+    struct response_st *response = &ATTACHMENT(key)->origin.response;
+    enum pop3_state ret = FILTER;
 
+    buffer  *b = response->rb;
+    uint8_t *ptr;
+    size_t  count;
+    ssize_t  n;
+
+    ptr = buffer_write_ptr(b, &count);
+    n = read(key->fd, ptr, count);
+
+    if(n > 0) {
+        buffer_write_adv(b, n);
+        selector_status ss = SELECTOR_SUCCESS;
+        ss |= selector_set_interest_key(key, OP_NOOP);
+        ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_WRITE);
+        ret = ss == SELECTOR_SUCCESS ? RESPONSE : ERROR;
+    } 
+    else if (n == 0) {
+        ptr[0] = '\r';
+        ptr[1] = '\n';
+        ptr[2] = '.';
+        ptr[3] = '\r';
+        ptr[4] = '\n';
+        buffer_write_adv(b, 5);
+        selector_status ss = SELECTOR_SUCCESS;
+        ss |= selector_set_interest_key(key, OP_NOOP);
+        ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_WRITE);
+        ret = ss == SELECTOR_SUCCESS ? RESPONSE : ERROR;
+    }
+    else {
+        ret = ERROR;
+    }
+
+    return ret;
 }
 
 /** definición de handlers para cada estado */

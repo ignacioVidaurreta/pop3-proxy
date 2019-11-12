@@ -1,7 +1,7 @@
 #ifndef TRANSFORMATIONS__H
 #define TRANSFORMATIONS__H
 
-#include "pop3.h"
+#include "pop3nio.h"
 
 #define TRANSFORMATION_START_ERR_MSG "failed to start external process:"
 #define EXIT_MSG "exiting"
