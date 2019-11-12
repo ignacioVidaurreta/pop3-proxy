@@ -529,15 +529,16 @@ static unsigned capa_write(struct selector_key *key){
 /** inicializa las variables del estado REQUEST */
 static void request_init(const unsigned state, struct selector_key *key) {
     struct request_st * d = &ATTACHMENT(key)->client.request;
+    ATTACHMENT(key)->requests = create_queue();
+
     d->buffer = &ATTACHMENT(key)->request_buffer;
     d->cmd_buffer = &ATTACHMENT(key)->cmd_request_buffer;
     d->aux_buffer = &ATTACHMENT(key)->request_aux_buffer;
 
-    ATTACHMENT(key)->client.requests = create_queue();
 }
 
 static void parse_and_queue_commands(struct selector_key *key, buffer *buff, ssize_t  n ) {
-    queue * requests = ATTACHMENT(key)->client.requests;
+    queue * requests = ATTACHMENT(key)->requests;
 
     if (!buffer_can_read(buff))
         return;
@@ -553,9 +554,12 @@ static void parse_and_queue_commands(struct selector_key *key, buffer *buff, ssi
             char c = buffer_read(buff);
             if (c == '\n') {
                 aux_n = i;
+                buffer_write(aux_buff, c);
+                c = '\0';
             }
             buffer_write(aux_buff, c);
         }
+
         n-=i;
         struct request_st * aux_request = malloc(sizeof(struct request_st));
         aux_request->cmd_buffer = aux_buff;
@@ -598,7 +602,7 @@ static unsigned request_read(struct selector_key *key){
 }
 
 static ssize_t send_next_request(struct selector_key *key, buffer *b) {
-    buffer *cb            = ((struct request_st*)peek(ATTACHMENT(key)->client.requests))->cmd_buffer;
+    buffer *cb            = ((struct request_st*)peek(ATTACHMENT(key)->requests))->cmd_buffer;
     uint8_t *cptr;
 
     size_t count;
@@ -669,7 +673,7 @@ static ssize_t send_next_request(struct selector_key *key, buffer *b) {
 
 /** Escribe la request en el server */
 static unsigned request_write(struct selector_key *key) {
-    struct request_st *d        = peek(ATTACHMENT(key)->client.requests);
+    struct request_st *d        = peek(ATTACHMENT(key)->requests);
     enum pop3_state ret         = REQUEST;
 
     buffer *b                   = d->buffer;
@@ -897,7 +901,7 @@ static unsigned response_write(struct selector_key *key){
                 }
                 else {
                     //Eliminamos el primer request de la queue
-                    queue * requests = ATTACHMENT(key)->client.requests;
+                    queue * requests = ATTACHMENT(key)->requests;
                     pop(requests);
 
                     if(requests->size > 0) {

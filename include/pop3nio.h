@@ -155,9 +155,10 @@ struct pop3 {
     /** estados para el client_fd */
     union {
         struct request_st         request;
-        queue *                   requests;
         // struct error_st           error;
     } client;
+
+    struct queue * requests;
 
     /** estados para el origin_fd */
     union {
