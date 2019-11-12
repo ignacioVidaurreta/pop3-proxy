@@ -793,14 +793,23 @@ static void response_init(const unsigned state, struct selector_key *key){
     d->wb = &(ATTACHMENT(key)->write_buffer);
 }
 
+// bool is_retr_command(buffer* cmd_buffer){
+
+// }
+
 static unsigned response_read(struct selector_key *key){
     struct response_st *d = &ATTACHMENT(key)->origin.response;
+    //struct request_st *latest_request = (struct request_st*) peek(&ATTACHMENT(key)->requests);
     enum pop3_state ret      = RESPONSE;
 
     buffer  *b         = d->rb;
     uint8_t *ptr;
     size_t  count;
     ssize_t  n;
+
+    // if (is_retr_command(latest_request->cmd_buffer)){
+
+    // }
 
     ptr = buffer_write_ptr(b, &count);
     n = recv(key->fd, ptr, count, 0);
@@ -879,46 +888,29 @@ static unsigned response_write(struct selector_key *key){
         ret = SELECTOR_SUCCESS == ss ? RESPONSE : ERROR;
     }else{
         if(ret != DONE){
-//            if(ATTACHMENT(key)->has_pipelining){
-//                struct next_request *aux = ATTACHMENT(key)->client.request.next_cmd_type;
-//                selector_status ss = SELECTOR_SUCCESS;
-//                ss |= selector_set_interest_key(key, OP_NOOP);
-//                if (aux != NULL) {
-//                    ATTACHMENT(key)->client.request.cmd_type = aux->cmd_type;
-//                    ATTACHMENT(key)->client.request.next_cmd_type = aux->next;
-//                    free(aux);
-//                    ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_WRITE);
-//                    ret = ss == SELECTOR_SUCCESS ? RESPONSE : ERROR;
-//                } else {
-//                    ATTACHMENT(key)->client.request.last_cmd_type = NULL;
-//                    ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_WRITE);
-//                    ret = SELECTOR_SUCCESS == ss ? REQUEST : ERROR;
-//                }
-//            }else{
-                selector_status ss = SELECTOR_SUCCESS;
-                ss |= selector_set_interest_key(key, OP_NOOP);
-                if(strcmp((char*)d->wb->limit, "quit\n") == 0){
-                    metrics->concurrent_connections--;
-                    return DONE;
-                }else if (buffer_can_read(b)) {
+            selector_status ss = SELECTOR_SUCCESS;
+            ss |= selector_set_interest_key(key, OP_NOOP);
+            if(strcmp((char*)d->wb->limit, "quit\n") == 0){
+                metrics->concurrent_connections--;
+                return DONE;
+            }else if (buffer_can_read(b)) {
+                ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_WRITE);
+                ret = ss == SELECTOR_SUCCESS ? RESPONSE : ERROR;
+            }
+            else {
+                //Eliminamos el primer request de la queue
+                queue * requests = ATTACHMENT(key)->requests;
+                pop(requests);
+
+                if(requests->size > 0) {
                     ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_WRITE);
-                    ret = ss == SELECTOR_SUCCESS ? RESPONSE : ERROR;
+                    ret = SELECTOR_SUCCESS == ss ? REQUEST : ERROR;
                 }
                 else {
-                    //Eliminamos el primer request de la queue
-                    queue * requests = ATTACHMENT(key)->requests;
-                    pop(requests);
-
-                    if(requests->size > 0) {
-                        ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_WRITE);
-                        ret = SELECTOR_SUCCESS == ss ? REQUEST : ERROR;
-                    }
-                    else {
-                        ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_READ);
-                        ret = SELECTOR_SUCCESS == ss ? REQUEST : ERROR;
-                    }
+                    ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_READ);
+                    ret = SELECTOR_SUCCESS == ss ? REQUEST : ERROR;
                 }
-//            }
+            }
         }
     }
 
@@ -930,6 +922,27 @@ void error_print(){
     printf("THERE HAS BEEN AN ERROR");
 }
 
+///////      RESPONSE      ///////
+
+static void
+filter_init(const unsigned state, struct selector_key *key) 
+{
+    struct filter_st * filter = &ATTACHMENT(key)->filter;
+    filter->original_buffer = &ATTACHMENT(key)->read_buffer;
+    filter->filtered_mail_buffer = &ATTACHMENT(key)->write_buffer;
+}
+
+static unsigned
+filter_send(struct selector_key *key) 
+{
+
+}
+
+static unsigned
+filter_recv(struct selector_key *key) 
+{
+
+}
 
 /** definición de handlers para cada estado */
 static const struct state_definition client_statbl[] = {
@@ -964,9 +977,9 @@ static const struct state_definition client_statbl[] = {
     },
     {
         .state            = FILTER,
-/*         .on_arrival       = filter_init,
+        .on_arrival       = filter_init,
         .on_write_ready   = filter_send,
-        .on_read_ready    = filter_recv, */
+        .on_read_ready    = filter_recv,
     },
      {
         .state            = DONE,
