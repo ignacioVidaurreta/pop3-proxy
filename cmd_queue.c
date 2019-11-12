@@ -5,6 +5,7 @@
 queue* create_queue(){
     queue* list = malloc(sizeof(*list));
     list->first = NULL;
+    list->size = 0;
     return list;
 }
 
