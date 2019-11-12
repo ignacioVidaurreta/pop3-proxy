@@ -554,8 +554,6 @@ static void parse_and_queue_commands(struct selector_key *key, buffer *buff, ssi
             char c = buffer_read(buff);
             if (c == '\n') {
                 aux_n = i;
-                buffer_write(aux_buff, c);
-                c = '\0';
             }
             buffer_write(aux_buff, c);
         }
@@ -680,7 +678,13 @@ static unsigned request_write(struct selector_key *key) {
     buffer *b                   = d->buffer;
     ssize_t  n;
 
-    n = send_next_request(key, b);
+    uint8_t *cptr;
+
+    size_t count;
+    cptr = buffer_read_ptr(d->cmd_buffer, &count);
+
+
+    n = send(ATTACHMENT(key)->origin_fd, cptr, count, MSG_NOSIGNAL);//send_next_request(key, b);
 
     if(n == -1) {
         ret = ERROR;
@@ -845,9 +849,9 @@ send_to_server(struct selector_key *key, buffer * b) {
 
     sptr = buffer_read_ptr(sb, &count);
 
-    if (strncasecmp((char*)sptr, "+OK", 3) != 0) {
-        ATTACHMENT(key)->client.request.cmd_type = DEFAULT;
-    }
+//    if (strncasecmp((char*)sptr, "+OK", 3) != 0) {
+//        ATTACHMENT(key)->client.request.cmd_type = DEFAULT;
+//    }
 
     n = send(ATTACHMENT(key)->client_fd, sptr, count, MSG_NOSIGNAL);
 
