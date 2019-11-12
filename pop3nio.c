@@ -906,11 +906,11 @@ static unsigned response_write(struct selector_key *key){
                     pop(requests);
 
                     if(requests->size > 0) {
-                        ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_WRITE);
+                        ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_WRITE);
                         ret = SELECTOR_SUCCESS == ss ? REQUEST : ERROR;
                     }
                     else {
-                        ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_READ);
+                        ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_READ);
                         ret = SELECTOR_SUCCESS == ss ? REQUEST : ERROR;
                     }
                 }
@@ -920,6 +920,10 @@ static unsigned response_write(struct selector_key *key){
 
 
     return ret;
+}
+
+void error_print(){
+    printf("THERE HAS BEEN AN ERROR");
 }
 
 
@@ -964,6 +968,7 @@ static const struct state_definition client_statbl[] = {
         .state            = DONE,
     },{
         .state            = ERROR,
+        .on_arrival       = error_print,
     }
 };
 
