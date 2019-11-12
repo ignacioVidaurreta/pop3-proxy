@@ -10,7 +10,6 @@
 #include <sys/wait.h>
 #include <pthread.h>
 #include <poll.h>
-#include <pop3nio.h>
 
 
 #include "include/pop3nio.h"
@@ -534,8 +533,38 @@ static void request_init(const unsigned state, struct selector_key *key) {
     d->cmd_buffer = &ATTACHMENT(key)->cmd_request_buffer;
     d->aux_buffer = &ATTACHMENT(key)->request_aux_buffer;
 
-    queue * requests = &ATTACHMENT(key)->client.requests;
+    queue * requests = ATTACHMENT(key)->client.requests;
+    requests = malloc(sizeof(*requests));
     requests = create_queue();
+    int lel;
+}
+
+static void parse_and_queue_commands(struct selector_key *key, buffer *buff, ssize_t  n ) {
+    queue * requests = ATTACHMENT(key)->client.requests;
+
+    if (!buffer_can_read(buff))
+        return;
+
+    while (buffer_can_read(buff) && n > 0) {
+        buffer * aux_buff = malloc(sizeof(*aux_buff));
+        uint8_t raw_buff_aux[BUFFER_MAX_SIZE];
+        buffer_init(aux_buff,  N(raw_buff_aux), raw_buff_aux);
+        ssize_t aux_n = 0;
+        size_t i = 0;
+        while (buffer_can_read(buff) && aux_n == 0) {
+            i++;
+            char c = buffer_read(buff);
+            if (c == '\n') {
+                aux_n = i;
+            }
+            buffer_write(aux_buff, c);
+        }
+        n-=i;
+        struct request_st * aux_request = malloc(sizeof(struct request_st));
+        aux_request->cmd_buffer = aux_buff;
+        add_element(requests,aux_request);
+    }
+
 }
 
 /** Lee la request del cliente */
@@ -551,10 +580,12 @@ static unsigned request_read(struct selector_key *key){
     ptr = buffer_write_ptr(buff, &count);
     n = recv(key->fd, ptr, count, 0);
 
-
-
     if(n > 0 || buffer_can_read(buff)) {
+
         buffer_write_adv(buff, n);
+        parse_and_queue_commands(key, buff, n);
+
+
         selector_status ss = SELECTOR_SUCCESS;
         ss |= selector_set_interest_key(key, OP_NOOP);
         ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_WRITE);
@@ -570,7 +601,7 @@ static unsigned request_read(struct selector_key *key){
 }
 
 static ssize_t send_next_request(struct selector_key *key, buffer *b) {
-    buffer *cb            = ((request_st)ATTACHMENT(key)->client.requests.peek()).cmd_buffer;
+    buffer *cb            = ((struct request_st*)peek(ATTACHMENT(key)->client.requests))->cmd_buffer;
     uint8_t *cptr;
 
     size_t count;
@@ -634,7 +665,7 @@ static ssize_t send_next_request(struct selector_key *key, buffer *b) {
         n = send(ATTACHMENT(key)->origin_fd, cptr, count, MSG_NOSIGNAL);
 //    }
 
-    buffer_reset(cb);
+    buffer_reset(cb);//TODO habria que destruir?
 
     return n;
 }
