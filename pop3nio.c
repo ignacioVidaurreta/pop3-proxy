@@ -533,10 +533,7 @@ static void request_init(const unsigned state, struct selector_key *key) {
     d->cmd_buffer = &ATTACHMENT(key)->cmd_request_buffer;
     d->aux_buffer = &ATTACHMENT(key)->request_aux_buffer;
 
-    queue * requests = ATTACHMENT(key)->client.requests;
-    requests = malloc(sizeof(*requests));
-    requests = create_queue();
-    int lel;
+    ATTACHMENT(key)->client.requests = create_queue();
 }
 
 static void parse_and_queue_commands(struct selector_key *key, buffer *buff, ssize_t  n ) {
