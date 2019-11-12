@@ -643,11 +643,10 @@ static unsigned request_write(struct selector_key *key) {
         ret = SELECTOR_SUCCESS == ss ? REQUEST : ERROR;
     }
     else {
-            if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_READ)) {
-                ret = RESPONSE;
-            } else {
-                ret = ERROR;
-            }
+            selector_status ss = SELECTOR_SUCCESS;
+            ss |= selector_set_interest_key(key, OP_NOOP);
+            ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_READ);
+            ret = SELECTOR_SUCCESS == ss ? RESPONSE : ERROR;
     }
 
     if(ret == ERROR) {

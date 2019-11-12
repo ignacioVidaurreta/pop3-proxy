@@ -38,10 +38,10 @@ test: all
 	@echo "$(GREEN)Done!$(NORMAL)"
 
 run: all
-	@./$(EXEC_NAME)
+	@./$(EXEC_NAME) localhost
 
 gdb: debug
-	gdb $(DEBUG_NAME) 
+	gdb --args $(DEBUG_NAME) localhost
 
 valgrind: all
 	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./$(EXEC_NAME)
