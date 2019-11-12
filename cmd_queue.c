@@ -38,7 +38,7 @@ int add_elementR(node* curr_node, void* value){
 }
 
 void* peek(queue* list){
-    return list->first;
+    return list->first->elem;
 }
 
 void* pop(queue* list){
