@@ -74,6 +74,8 @@ pop3_new(int client_fd){
     ret->stm    .states    = pop3_describe_states();
     stm_init(&ret->stm);
 
+    ret->requests = create_queue();
+
     buffer_init(&ret->read_buffer,  N(ret->raw_buff_a), ret->raw_buff_a);
     buffer_init(&ret->write_buffer, N(ret->raw_buff_b), ret->raw_buff_b);
     buffer_init(&ret->request_buffer, N(ret->raw_buff_c), ret->raw_buff_c);
@@ -529,7 +531,6 @@ static unsigned capa_write(struct selector_key *key){
 /** inicializa las variables del estado REQUEST */
 static void request_init(const unsigned state, struct selector_key *key) {
     struct request_st * d = &ATTACHMENT(key)->client.request;
-    ATTACHMENT(key)->requests = create_queue();
 
     d->buffer = &ATTACHMENT(key)->request_buffer;
     d->cmd_buffer = &ATTACHMENT(key)->cmd_request_buffer;
