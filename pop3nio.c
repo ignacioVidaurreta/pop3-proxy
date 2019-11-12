@@ -718,7 +718,7 @@ bool is_retr_command(uint8_t* cmd_string){
         if (tolower(cmd_string[i]) != retr_string[i])
             return false;
     }
-    while (i < strlen(cmd_string) && cmd_string[i] != '\0'){
+    while (i < strlen(cmd_string) && cmd_string[i] != '\n'){
         if (!isdigit(cmd_string[i++]))
             return false;
     }
