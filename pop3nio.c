@@ -602,7 +602,8 @@ static unsigned request_read(struct selector_key *key){
 }
 
 static ssize_t send_next_request(struct selector_key *key, buffer *b) {
-    buffer *cb            = ((struct request_st*)peek(ATTACHMENT(key)->requests))->cmd_buffer;
+    struct request_st* req = (struct request_st*)peek(ATTACHMENT(key)->requests);
+    buffer *cb            = req->cmd_buffer;
     uint8_t *cptr;
 
     size_t count;
