@@ -608,36 +608,36 @@ static ssize_t send_next_request(struct selector_key *key, buffer *b) {
     size_t count;
     ssize_t n = 0;
 
-    size_t i = 0;
+//    size_t i = 0;
 
-    if (!buffer_can_read(b))
+    if (!buffer_can_read(cb))
         return 0;
 
-    while (buffer_can_read(b) && n == 0) {
-        i++;
-        char c = buffer_read(b);
-        if (c == '\n') {
-            n = i;
-        }
-        buffer_write(cb, c);
-    }
-
-    if (n == 0) {
-        return 0;
-    }
+//    while (buffer_can_read(b) && n == 0) {
+//        i++;
+//        char c = buffer_read(b);
+//        if (c == '\n') {
+//            n = i;
+//        }
+//        buffer_write(cb, c);
+//    }
+//
+//    if (n == 0) {
+//        return 0;
+//    }
 
     cptr = buffer_read_ptr(cb, &count);
 
-    int cmd_n;
-    char cmd[16], arg1[32], arg2[32], extra[5];
-    char * aux = malloc(count+1);
-    memcpy(aux, cptr, count);
-    aux[count] = '\0';
-    cmd_n = sscanf(aux, "%s %s %s %s", cmd, arg1, arg2, extra);
-
-    assign_cmd(key, cmd, cmd_n);
-
-    free(aux);
+//    int cmd_n;
+//    char cmd[16], arg1[32], arg2[32], extra[5];
+//    char * aux = malloc(count+1);
+//    memcpy(aux, cptr, count);
+//    aux[count] = '\0';
+//    cmd_n = sscanf(aux, "%s %s %s %s", cmd, arg1, arg2, extra);
+//
+//    assign_cmd(key, cmd, cmd_n);
+//
+//    free(aux);
 
 //    if (ATTACHMENT(key)->has_pipelining) {
 //        struct next_request *next = malloc(sizeof(next));
@@ -666,7 +666,7 @@ static ssize_t send_next_request(struct selector_key *key, buffer *b) {
         n = send(ATTACHMENT(key)->origin_fd, cptr, count, MSG_NOSIGNAL);
 //    }
 
-    buffer_reset(cb);//TODO habria que destruir?
+    buffer_compact(cb);//TODO habria que destruir?
 
     return n;
 }
