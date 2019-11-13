@@ -47,7 +47,7 @@ struct next_request {
 };
 
 struct filter_st {
-    buffer                      *original_mail_buffer, *filtered_mail_buffer;
+    buffer                      *original_mail_buffer, *filtered_mail_buffer, *write_buffer;
     struct parser               *multi_parser;
 };
 /** maquina de estados general */

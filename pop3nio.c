@@ -743,10 +743,17 @@ static unsigned response_read(struct selector_key *key){
     // fprintf(stderr, "TU FIEJAAA should be 0:%d\n", is_retr_command("RETR2"));
 
     if (is_retr_command(latest_request)){
-        selector_status ss = SELECTOR_SUCCESS;
-        ss |= selector_set_interest_key(key, OP_NOOP);
-        ss |= selector_set_interest(key->s, ATTACHMENT(key)->write_to_filter_fds[1], OP_WRITE);
-        ret = ss == SELECTOR_SUCCESS ? FILTER : ERROR;
+        ptr = buffer_write_ptr(b, &count);
+        n = recv(key->fd, ptr, count, 0);
+        if(n > 0) {
+            buffer_write_adv(b, n);
+            selector_status ss = SELECTOR_SUCCESS;
+            ss |= selector_set_interest_key(key, OP_NOOP);
+            ss |= selector_set_interest(key->s, ATTACHMENT(key)->write_to_filter_fds[1], OP_WRITE);
+            ret = ss == SELECTOR_SUCCESS ? FILTER : ERROR;
+        } else {
+            ret = ERROR;
+        }
     } else {
         ptr = buffer_write_ptr(b, &count);
         n = recv(key->fd, ptr, count, 0);
@@ -883,6 +890,10 @@ start_external_filter_process(struct selector_key *key){
             printf("%s failed to create pipes. %s", TRANSFORMATION_START_ERR_MSG, EXIT_MSG);
             exit(1);
         }
+
+        putenv("FILTER_MEDIAS=text/plain");
+        putenv("FILTER_MSG=[[REDACTED]]");
+
         execl("/bin/sh", "sh", "-c", options->cmd, NULL);
     } else {
         close(ATTACHMENT(key)->write_to_filter_fds[0]);
@@ -910,20 +921,46 @@ static void
 filter_init(const unsigned state, struct selector_key *key) 
 {
     struct filter_st * filter = &ATTACHMENT(key)->filter;
-    filter->original_mail_buffer = &ATTACHMENT(key)->read_buffer;
-    filter->filtered_mail_buffer = &ATTACHMENT(key)->write_buffer;
+    
+    filter->original_mail_buffer = &(ATTACHMENT(key)->read_buffer);
+    filter->filtered_mail_buffer = &(ATTACHMENT(key)->write_buffer);
     start_external_filter_process(key);
 }
 
-int write_buffer_to_filter(struct selector_key *key, uint8_t* buffer){
-    int bytes_transfered = dprintf(ATTACHMENT(key)->write_to_filter_fds[1], (char*)buffer);
-    if(bytes_transfered < 0)
-        print_error("Error writing to fd", get_time());
-    return bytes_transfered;
+int write_buffer_to_filter(struct selector_key *key, buffer* buff){
+    struct filter_st * filter = &ATTACHMENT(key)->filter;
+    buffer *sb = filter->write_buffer;
+    uint8_t *sptr;
+
+    size_t count;
+    ssize_t n = 0;
+
+    size_t i = 0;
+
+    while (buffer_can_read(buff) && n == 0) {
+        i++;
+        char c = buffer_read(buff);
+        if (c == '\n') {
+            n = i;
+        }
+        buffer_write(sb, c);
+    }
+
+    if (n == 0) {
+        return 0;
+    }
+
+    sptr = buffer_read_ptr(sb, &count);
+
+    n = write(ATTACHMENT(key)->write_to_filter_fds[1], sptr, count);
+
+    buffer_reset(sb);
+
+    return n;
 }
 
-int read_transformation(struct selector_key *key, uint8_t* buffer) {
-    int bytes_read = read(ATTACHMENT(key)->read_from_filter_fds[0], buffer, strlen((char*)buffer));
+int read_transformation(struct selector_key *key, buffer* buff) {
+    int bytes_read = read(ATTACHMENT(key)->read_from_filter_fds[0], buff, strlen((char*)buff));
     if( bytes_read < 0)
         print_error("Error reading from fd", get_time());
     return bytes_read;
@@ -936,8 +973,14 @@ filter_send(struct selector_key *key)
     enum pop3_state ret;
 
     buffer  *b         = d->original_mail_buffer;
+    uint8_t *ptr;
+    size_t   count;
     ssize_t  n;
-    n = write_buffer_to_filter(key, b);
+
+    ptr = buffer_read_ptr(b, &count);
+    //n = write_buffer_to_filter(key, b);
+    n = write(ATTACHMENT(key)->write_to_filter_fds[1], ptr, count);
+    //write_buffer_to_filter(key, b);
 
     if(n == -1) {
         ret = ERROR;
