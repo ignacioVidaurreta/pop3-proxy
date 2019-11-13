@@ -725,6 +725,13 @@ bool is_retr_command(uint8_t* cmd_string){
     return true;
 }
 
+bool is_error_response(buffer* buff){
+    return *buff->read == '-' &&
+            *(buff->read+1) == 'E' &&
+            *(buff->read+2) == 'R' &&
+            *(buff->read+3) == 'R';
+}
+
 static unsigned response_read(struct selector_key *key){
     struct response_st *d = &ATTACHMENT(key)->origin.response;
     uint8_t * latest_request = (uint8_t *)peek(ATTACHMENT(key)->requests);
@@ -742,9 +749,13 @@ static unsigned response_read(struct selector_key *key){
     // fprintf(stderr, "TU FIEJAAA should be 0:%d\n", is_retr_command("RET 2"));
     // fprintf(stderr, "TU FIEJAAA should be 0:%d\n", is_retr_command("RETR2"));
 
-    if (is_retr_command(latest_request)){
-        ptr = buffer_write_ptr(b, &count);
-        n = recv(key->fd, ptr, count, 0);
+    //fprintf(stderr, "TU FIEJAAA should be 1:%d\n", is_err("RETR2"));
+
+    ptr = buffer_write_ptr(b, &count);
+    n = recv(key->fd, ptr, count, 0);
+
+    if (is_retr_command(latest_request) && !is_error_response(b)){
+
         if(n > 0) {
             buffer_write_adv(b, n);
             selector_status ss = SELECTOR_SUCCESS;
@@ -755,8 +766,6 @@ static unsigned response_read(struct selector_key *key){
             ret = ERROR;
         }
     } else {
-        ptr = buffer_write_ptr(b, &count);
-        n = recv(key->fd, ptr, count, 0);
 
         if(n > 0) {
             buffer_write_adv(b, n);
