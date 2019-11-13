@@ -817,12 +817,21 @@ static unsigned response_write(struct selector_key *key){
     buffer  *b = d->rb;
     ssize_t  n;
 
+    if (ATTACHMENT(key)->has_filtered_mail){
+        uint8_t *ptr;
+        size_t count;
+        ssize_t n = 0;
+        ptr = buffer_read_ptr(filter->filtered_mail_buffer, &count);
+
+        n = send(ATTACHMENT(key)->client_fd, ptr, count, MSG_NOSIGNAL);
+
+    } else {
+        n = send_to_server(key, b);
+    }
+
+    
     if (ATTACHMENT(key)->has_filtered_mail)
-        b = filter->filtered_mail_buffer;
-
-    n = send_to_server(key, b);
-
-    //buffer_reset(filter->filtered_mail_buffer);
+        buffer_reset(filter->filtered_mail_buffer);
 
     if (n == -1) {
         ret = ERROR;
