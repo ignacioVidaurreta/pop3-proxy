@@ -861,10 +861,12 @@ start_external_filter_process(struct selector_key *key){
 
     if(ATTACHMENT(key)->external_process)
         return;
-    if(pipe(ATTACHMENT(key)->write_to_filter_fds) == -1 || pipe(ATTACHMENT(key)->read_from_filter_fds) == -1) {
+    if(pipe(ATTACHMENT(key)->write_to_filter_fds) == -1 || 
+        pipe(ATTACHMENT(key)->read_from_filter_fds) == -1) {
         printf("%s failed to create pipes. %s", TRANSFORMATION_START_ERR_MSG, EXIT_MSG);
         exit(1);
     }
+
     ATTACHMENT(key)->external_process = fork();
     if(ATTACHMENT(key)->external_process == -1) {
         printf("%s failed to start external process. %s", TRANSFORMATION_START_ERR_MSG, EXIT_MSG);
@@ -872,12 +874,36 @@ start_external_filter_process(struct selector_key *key){
     }
     else if(ATTACHMENT(key)->external_process == 0) {
         logger(INFO, "Running transformation on email", get_time());
-        if(dup2(ATTACHMENT(key)->write_to_filter_fds[0], STDIN_FILENO) == -1 || dup2(ATTACHMENT(key)->read_from_filter_fds[1], STDOUT_FILENO) == -1) {
+
+        close(ATTACHMENT(key)->write_to_filter_fds[1]);
+        close(ATTACHMENT(key)->read_from_filter_fds[0]);
+
+        if(dup2(ATTACHMENT(key)->write_to_filter_fds[0], STDIN_FILENO) == -1 || 
+            dup2(ATTACHMENT(key)->read_from_filter_fds[1], STDOUT_FILENO) == -1) {
             printf("%s failed to create pipes. %s", TRANSFORMATION_START_ERR_MSG, EXIT_MSG);
             exit(1);
         }
         execl("/bin/sh", "sh", "-c", options->cmd, NULL);
+    } else {
+        close(ATTACHMENT(key)->write_to_filter_fds[0]);
+        close(ATTACHMENT(key)->read_from_filter_fds[1]);
+
+         selector_status ss = SELECTOR_SUCCESS;
+        ss |= selector_register(key->s, ATTACHMENT(key)->write_to_filter_fds[1], &pop3_handler,
+                                    OP_WRITE, key->data);
+
+        ss |= selector_register(key->s, ATTACHMENT(key)->read_from_filter_fds[0], &pop3_handler,
+                                    OP_READ, key->data);
+
+        if (selector_fd_set_nio(ATTACHMENT(key)->write_to_filter_fds[1]) == -1 ||
+            selector_fd_set_nio(ATTACHMENT(key)->read_from_filter_fds[0]) == -1) {
+            return -1;
+        }
     }
+
+
+
+    
 }
 
 static void
@@ -888,12 +914,6 @@ filter_init(const unsigned state, struct selector_key *key)
     filter->filtered_mail_buffer = &ATTACHMENT(key)->write_buffer;
     start_external_filter_process(key);
 }
-
-// void
-// send_mail_to_filter(struct selector_key *key, buffer* b){
-
-
-// }
 
 int write_buffer_to_filter(struct selector_key *key, uint8_t* buffer){
     int bytes_transfered = dprintf(ATTACHMENT(key)->write_to_filter_fds[1], (char*)buffer);
