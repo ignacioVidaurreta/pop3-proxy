@@ -7,15 +7,17 @@ typedef struct node {
     void* elem;
 } node;
 
-typedef struct list_head{
+typedef struct queue{
     node* first;
     unsigned long size;
-} list_head;
+} queue;
 
-list_head* create_queue();
-int add_element(list_head* list, void* value);
+queue* create_queue();
+int add_element(queue* list, void* value);
 int add_elementR(node* curr_node, void* value);
-void free_queue(list_head* list);
+void* peek(queue* list);
+void* pop(queue* list);
+void free_queue(queue* list);
 void free_node(node* node);
 
 #endif /* CMD_QUEUE_H */

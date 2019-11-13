@@ -6,14 +6,14 @@
 #define N 10000
 
 void test_create_list(CuTest *tc){
-    list_head* list = create_queue();
+    queue* list = create_queue();
 
     CuAssertPtrNotNull(tc, list);
     CuAssertPtrEquals(tc, NULL, list->first);
 }
 
 void test_add_element_list(CuTest *tc){
-    list_head* list = create_queue(); // Already tested
+    queue* list = create_queue(); // Already tested
     int expected_value = 3;
     add_element(list, (void*)&expected_value);
 
@@ -24,7 +24,7 @@ void test_add_element_list(CuTest *tc){
 }
 
 void test_add_two_elements_list(CuTest *tc){
-    list_head* list = create_queue();
+    queue* list = create_queue();
     int first_expected = 2;
     int second_expected = 3;
     add_element(list, (void*)&first_expected);
@@ -39,7 +39,7 @@ void test_add_two_elements_list(CuTest *tc){
 }
 
 void test_add_n_elements_list(CuTest *tc){
-    list_head* list = create_queue();
+    queue* list = create_queue();
     int expected = 0;
     
     add_element(list, (void*)&expected);

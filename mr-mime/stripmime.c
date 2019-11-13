@@ -527,6 +527,10 @@ main(const int argc, const char **argv) {
     char *replacement_text = getenv("FILTER_MSG");
     char *aux_replacement_text = "[[This content has been blocked due to security reasons.]]";
     char *blocked_type    = getenv("FILTER_MEDIAS");
+    if (blocked_type == NULL){
+        perror("Please set the FILTER_MEDIAS environment variable before running the filter :)");
+        return 1;
+    }
 
     const unsigned int* no_class = parser_no_classes();
     struct parser_definition media_header_def =

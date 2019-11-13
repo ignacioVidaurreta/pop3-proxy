@@ -4,6 +4,7 @@
 #include <sys/socket.h> 
 #include "stm.h"
 #include "buffer.h"
+#include "cmd_queue.h"
 
 struct response_st {
     buffer                  *wb, *rb;
@@ -15,6 +16,7 @@ enum request_cmd_type {
             LIST,
             CAPA,
             TOP,
+            UIDL,
             USER,
             PASS,
             DELE,
@@ -42,6 +44,11 @@ struct response_recv {
 struct next_request {
     enum request_cmd_type cmd_type;
     struct next_request   *next;
+};
+
+struct filter_st {
+    buffer                      *original_mail_buffer, *filtered_mail_buffer, *write_buffer;
+    struct parser               *multi_parser;
 };
 /** maquina de estados general */
 enum pop3_state {
@@ -156,6 +163,8 @@ struct pop3 {
         // struct error_st           error;
     } client;
 
+    queue * requests;
+
     /** estados para el origin_fd */
     union {
         struct request_st         conn;
@@ -164,13 +173,18 @@ struct pop3 {
     } origin;
 
     /** estados para el filter_fd */
-    // union {
-    //     struct filter_st          filter;
-    // } filter;
+    union {
+        struct filter_st          filter;
+    } filter;
+
+    int                            write_to_filter_fds[2];
+    int                            read_from_filter_fds[2];
+    bool                           has_filtered_mail;
+    int                            external_process;
 
     /** buffers para ser usados read_buffer, write_buffer.*/
-    uint8_t raw_buff_a[2048], raw_buff_b[2048], raw_buff_c[2048], raw_buff_d[2048]; //Si necesitamos más buffers, los podemos agregar aca.
-    buffer read_buffer, write_buffer, request_buffer, cmd_request_buffer;
+    uint8_t raw_buff_a[BUFFER_MAX_SIZE], raw_buff_b[BUFFER_MAX_SIZE], raw_buff_c[BUFFER_MAX_SIZE], raw_buff_d[BUFFER_MAX_SIZE]; //Si necesitamos más buffers, los podemos agregar aca.
+    buffer read_buffer, write_buffer, request_buffer, cmd_request_buffer, request_aux_buffer;
     
     /** cantidad de referencias a este objeto. si es uno se debe destruir */
     unsigned references;
