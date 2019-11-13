@@ -749,34 +749,24 @@ static unsigned response_read(struct selector_key *key){
     // fprintf(stderr, "TU FIEJAAA should be 0:%d\n", is_retr_command("RET 2"));
     // fprintf(stderr, "TU FIEJAAA should be 0:%d\n", is_retr_command("RETR2"));
 
-    //fprintf(stderr, "TU FIEJAAA should be 1:%d\n", is_err("RETR2"));
-
     ptr = buffer_write_ptr(b, &count);
     n = recv(key->fd, ptr, count, 0);
 
-    if (is_retr_command(latest_request) && !is_error_response(b)){
-
-        if(n > 0) {
-            buffer_write_adv(b, n);
+    if(n > 0) {
+        buffer_write_adv(b, n);
+        if (is_retr_command(latest_request) && !is_error_response(b)){
             selector_status ss = SELECTOR_SUCCESS;
             ss |= selector_set_interest_key(key, OP_NOOP);
             ss |= selector_set_interest(key->s, ATTACHMENT(key)->write_to_filter_fds[1], OP_WRITE);
             ret = ss == SELECTOR_SUCCESS ? FILTER : ERROR;
         } else {
-            ret = ERROR;
-        }
-    } else {
-
-        if(n > 0) {
-            buffer_write_adv(b, n);
             selector_status ss = SELECTOR_SUCCESS;
             ss |= selector_set_interest_key(key, OP_NOOP);
             ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_WRITE);
             ret = ss == SELECTOR_SUCCESS ? RESPONSE : ERROR;
-
-        } else {
-            ret = ERROR;
         }
+    } else {
+        ret = ERROR;
     } 
 
     if(ret == ERROR) {
@@ -821,12 +811,18 @@ send_to_server(struct selector_key *key, buffer * b) {
 /** Escribe la respuesta en el cliente */
 static unsigned response_write(struct selector_key *key){
     struct response_st *d = &ATTACHMENT(key)->origin.response;
+    struct filter_st *filter = &ATTACHMENT(key)->filter;
     enum pop3_state ret = RESPONSE;
 
     buffer  *b = d->rb;
     ssize_t  n;
 
+    if (ATTACHMENT(key)->has_filtered_mail)
+        b = filter->filtered_mail_buffer;
+
     n = send_to_server(key, b);
+
+    //buffer_reset(filter->filtered_mail_buffer);
 
     if (n == -1) {
         ret = ERROR;
@@ -836,6 +832,7 @@ static unsigned response_write(struct selector_key *key){
         ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_READ);
         ret = SELECTOR_SUCCESS == ss ? RESPONSE : ERROR;
     }else{
+        ATTACHMENT(key)->has_filtered_mail = 0;
         if(ret != DONE){
             selector_status ss = SELECTOR_SUCCESS;
             ss |= selector_set_interest_key(key, OP_NOOP);
@@ -987,9 +984,7 @@ filter_send(struct selector_key *key)
     ssize_t  n;
 
     ptr = buffer_read_ptr(b, &count);
-    //n = write_buffer_to_filter(key, b);
     n = write(ATTACHMENT(key)->write_to_filter_fds[1], ptr, count);
-    //write_buffer_to_filter(key, b);
 
     if(n == -1) {
         ret = ERROR;
@@ -1000,6 +995,7 @@ filter_send(struct selector_key *key)
         ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_READ);
         ret = SELECTOR_SUCCESS == ss ? RESPONSE : ERROR;
     } else {
+        buffer_reset(b);
         selector_status ss = SELECTOR_SUCCESS;
         ss |= selector_set_interest_key(key, OP_NOOP);
         ss |= selector_set_interest(key->s, ATTACHMENT(key)->read_from_filter_fds[0], OP_READ);
@@ -1013,36 +1009,38 @@ filter_send(struct selector_key *key)
 static unsigned
 filter_recv(struct selector_key *key) 
 {
-    //struct filter_st *d = &ATTACHMENT(key)->filter;
-    struct response_st *response = &ATTACHMENT(key)->origin.response;
+    struct filter_st *d = &ATTACHMENT(key)->filter;
+    //struct response_st *response = &ATTACHMENT(key)->origin.response;
     enum pop3_state ret = FILTER;
 
-    buffer  *b = response->rb;
+    buffer  *b = d->filtered_mail_buffer;
     uint8_t *ptr;
     size_t  count;
     ssize_t  n;
 
     ptr = buffer_write_ptr(b, &count);
-    n = read_transformation(key, ptr);
+    n = read(ATTACHMENT(key)->read_from_filter_fds[0], ptr, count);
 
     if(n > 0) {
         buffer_write_adv(b, n);
+        ATTACHMENT(key)->has_filtered_mail = 1;
         selector_status ss = SELECTOR_SUCCESS;
         ss |= selector_set_interest_key(key, OP_NOOP);
         ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_WRITE);
         ret = ss == SELECTOR_SUCCESS ? RESPONSE : ERROR;
     } 
     else if (n == 0) {
-        ptr[0] = '\r';
-        ptr[1] = '\n';
-        ptr[2] = '.';
-        ptr[3] = '\r';
-        ptr[4] = '\n';
-        buffer_write_adv(b, 5);
+        // ptr[0] = '\r';
+        // ptr[1] = '\n';
+        // ptr[2] = '.';
+        // ptr[3] = '\r';
+        // ptr[4] = '\n';
+        // buffer_write_adv(b, 5);
         selector_status ss = SELECTOR_SUCCESS;
         ss |= selector_set_interest_key(key, OP_NOOP);
         ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_WRITE);
-        ret = ss == SELECTOR_SUCCESS ? RESPONSE : ERROR;
+        // ret = ss == SELECTOR_SUCCESS ? RESPONSE : ERROR;
+        ret = ERROR;
     }
     else {
         ret = ERROR;
