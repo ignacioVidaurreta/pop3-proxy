@@ -180,6 +180,7 @@ struct pop3 {
     int                            write_to_filter_fds[2];
     int                            read_from_filter_fds[2];
     bool                           has_filtered_mail;
+    bool                           has_read_entire_mail;
     int                            external_process;
 
     /** buffers para ser usados read_buffer, write_buffer.*/

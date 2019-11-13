@@ -84,6 +84,9 @@ pop3_new(int client_fd){
     buffer_init(&ret->cmd_request_buffer, N(ret->raw_buff_d), ret->raw_buff_d);
     buffer_init(&ret->request_aux_buffer,  N(ret->raw_buff_d), ret->raw_buff_d);
 
+    ret->has_filtered_mail = 0;
+    ret->has_read_entire_mail = 1;
+
     metrics->concurrent_connections++;
 
     ret->references = 1;
@@ -755,6 +758,11 @@ static unsigned response_read(struct selector_key *key){
     if(n > 0) {
         buffer_write_adv(b, n);
         if (is_retr_command(latest_request) && !is_error_response(b)){
+            ATTACHMENT(key)->has_read_entire_mail = *(b->write-1) == '\n' && 
+                                                    *(b->write-2) == '\r' &&
+                                                    *(b->write-3) == '.'  &&
+                                                    *(b->write-4) == '\n' &&
+                                                    *(b->write-5) == '\r';
             selector_status ss = SELECTOR_SUCCESS;
             ss |= selector_set_interest_key(key, OP_NOOP);
             ss |= selector_set_interest(key->s, ATTACHMENT(key)->write_to_filter_fds[1], OP_WRITE);
@@ -848,11 +856,13 @@ static unsigned response_write(struct selector_key *key){
             if(strcmp((char*)d->wb->limit, "quit\n") == 0){
                 metrics->concurrent_connections--;
                 return DONE;
-            }else if (buffer_can_read(b)) {
+            } else if (buffer_can_read(b)) {
                 ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_WRITE);
                 ret = ss == SELECTOR_SUCCESS ? RESPONSE : ERROR;
-            }
-            else {
+            } else if (!ATTACHMENT(key)->has_read_entire_mail){
+                ss |= selector_set_interest(key->s, ATTACHMENT(key)->origin_fd, OP_READ);
+                ret = SELECTOR_SUCCESS == ss ? RESPONSE : ERROR;
+            } else {
                 //Eliminamos el primer request de la queue
                 queue * requests = ATTACHMENT(key)->requests;
                 pop(requests);
@@ -1019,7 +1029,6 @@ static unsigned
 filter_recv(struct selector_key *key) 
 {
     struct filter_st *d = &ATTACHMENT(key)->filter;
-    //struct response_st *response = &ATTACHMENT(key)->origin.response;
     enum pop3_state ret = FILTER;
 
     buffer  *b = d->filtered_mail_buffer;
@@ -1039,12 +1048,6 @@ filter_recv(struct selector_key *key)
         ret = ss == SELECTOR_SUCCESS ? RESPONSE : ERROR;
     } 
     else if (n == 0) {
-        // ptr[0] = '\r';
-        // ptr[1] = '\n';
-        // ptr[2] = '.';
-        // ptr[3] = '\r';
-        // ptr[4] = '\n';
-        // buffer_write_adv(b, 5);
         selector_status ss = SELECTOR_SUCCESS;
         ss |= selector_set_interest_key(key, OP_NOOP);
         ss |= selector_set_interest(key->s, ATTACHMENT(key)->client_fd, OP_WRITE);
