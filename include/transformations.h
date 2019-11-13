@@ -14,14 +14,14 @@
 void create_process(struct state_manager* state);
 
 /**
- * reads what is in the given buffer to the given file descriptor.
+ * writes what is in the given buffer to the output-to-filter file descriptor.
  */
-void write_buffer(uint8_t* buffer, int write_fd);
+int write_buffer_to_filter(struct selector_key *key, uint8_t* buffer);
 
 /**
- * reads from the given file descriptor and puts the results into buffer.
+ * reads from the input-from-filter file descriptor and puts the results into buffer.
  */
-void read_transformation(uint8_t* buffer, int read_fd);
+int read_transformation(struct selector_key *key, uint8_t* buffer);
 
 /**
  * if the state has changed from FILTER kill the external process and free the used

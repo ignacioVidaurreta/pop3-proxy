@@ -745,7 +745,7 @@ static unsigned response_read(struct selector_key *key){
     if (is_retr_command(latest_request)){
         selector_status ss = SELECTOR_SUCCESS;
         ss |= selector_set_interest_key(key, OP_NOOP);
-        ss |= selector_set_interest(key->s, ATTACHMENT(key)->write_to_filter_fds, OP_WRITE);
+        ss |= selector_set_interest(key->s, ATTACHMENT(key)->write_to_filter_fds[1], OP_WRITE);
         ret = ss == SELECTOR_SUCCESS ? FILTER : ERROR;
     } else {
         ptr = buffer_write_ptr(b, &count);
@@ -889,6 +889,26 @@ filter_init(const unsigned state, struct selector_key *key)
     start_external_filter_process(key);
 }
 
+// void
+// send_mail_to_filter(struct selector_key *key, buffer* b){
+
+
+// }
+
+int write_buffer_to_filter(struct selector_key *key, uint8_t* buffer){
+    int bytes_transfered = dprintf(ATTACHMENT(key)->write_to_filter_fds[1], (char*)buffer);
+    if(bytes_transfered < 0)
+        print_error("Error writing to fd", get_time());
+    return bytes_transfered;
+}
+
+int read_transformation(struct selector_key *key, uint8_t* buffer) {
+    int bytes_read = read(ATTACHMENT(key)->read_from_filter_fds[0], buffer, strlen((char*)buffer));
+    if( bytes_read < 0)
+        print_error("Error reading from fd", get_time());
+    return bytes_read;
+}
+
 static unsigned
 filter_send(struct selector_key *key) 
 {
@@ -897,7 +917,7 @@ filter_send(struct selector_key *key)
 
     buffer  *b         = d->original_mail_buffer;
     ssize_t  n;
-    //n = send_mail_to_filter(key, b);
+    n = write_buffer_to_filter(key, b);
 
     if(n == -1) {
         ret = ERROR;
@@ -931,7 +951,7 @@ filter_recv(struct selector_key *key)
     ssize_t  n;
 
     ptr = buffer_write_ptr(b, &count);
-    n = read(key->fd, ptr, count);
+    n = read_transformation(key, ptr);
 
     if(n > 0) {
         buffer_write_adv(b, n);
