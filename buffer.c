@@ -51,7 +51,6 @@ buffer_read_ptr(buffer *b, size_t *nbyte) {
 
 inline void
 buffer_write_adv(buffer *b, const ssize_t bytes) {
-    metrics->transfered_bytes+=bytes; //TODO: ESto está bien?
     if(bytes > -1) {
         b->write += (size_t) bytes;
         assert(b->write <= b->limit);
@@ -60,7 +59,6 @@ buffer_write_adv(buffer *b, const ssize_t bytes) {
 
 inline void
 buffer_read_adv(buffer *b, const ssize_t bytes) {
-    metrics->transfered_bytes+=bytes;
     if(bytes > -1) {
         b->read += (size_t) bytes;
         assert(b->read <= b->write);

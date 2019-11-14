@@ -90,7 +90,7 @@ pop3_new(int client_fd){
     ret->has_filtered_entire_mail = 1;
 
 
-    metrics->concurrent_connections++;
+    update_metrics_new_connection();
 
     ret->references = 1;
 finally:
@@ -425,6 +425,8 @@ send_ehlo_status_line(struct selector_key *key, buffer * b) {
     read_ptr = buffer_read_ptr(wb, &count);
 
     n = send(ATTACHMENT(key)->client_fd, read_ptr, count, MSG_NOSIGNAL);
+    update_metrics_transfered_bytes(n);
+    
 
     buffer_reset(wb);
 
@@ -514,7 +516,9 @@ static unsigned capa_write(struct selector_key *key){
     enum pop3_state ret = CAPA_STATE;
 
     char * msg = "CAPA\r\n";
-    send(ATTACHMENT(key)->origin_fd, msg, strlen(msg), MSG_NOSIGNAL);
+    size_t n =  send(ATTACHMENT(key)->origin_fd, msg, strlen(msg), MSG_NOSIGNAL);
+    update_metrics_transfered_bytes(n);
+
 
     selector_status ss = SELECTOR_SUCCESS;
     ss |= selector_set_interest_key(key, OP_NOOP);
@@ -563,24 +567,6 @@ newline(const uint8_t c) {
 
     return request_done;
 }
-
-// static enum request_state
-// param(const uint8_t c, uint8_t * aux_cmd, int index) {
-//     enum request_state ret = request_param;
-
-//     if (c == '\r' || c == '\n') {
-//         if (c == '\r') {
-//             ret = request_newline;
-//         } else {
-//             ret = request_done;
-//         }
-
-//     } else {
-//         aux_cmd[index] = c;
-//     }
-
-//     return ret;
-// }
 
 enum request_state cmd(char c, uint8_t * aux_cmd, int index){
      enum request_state ret = request_cmd;
@@ -737,7 +723,8 @@ static ssize_t send_next_request(struct selector_key *key) {
         return 0;
     cptr = buffer_read_ptr(buff, &count);
     n = send(ATTACHMENT(key)->origin_fd, cptr, count, MSG_NOSIGNAL);
-    buffer_reset(buff);//TODO habria que destruir?
+    update_metrics_transfered_bytes(n);
+    buffer_reset(buff);
 
     return n;
 }
@@ -971,6 +958,8 @@ send_to_server(struct selector_key *key, buffer * b) {
     sptr = buffer_read_ptr(sb, &count);
 
     n = send(ATTACHMENT(key)->client_fd, sptr, count, MSG_NOSIGNAL);
+    update_metrics_transfered_bytes(n);
+
 
     buffer_reset(sb);
 
@@ -1008,6 +997,8 @@ static unsigned response_write(struct selector_key *key){
         ptr = buffer_read_ptr(filter->filtered_mail_buffer, &count);
 
         n = send(ATTACHMENT(key)->client_fd, ptr, count, MSG_NOSIGNAL);
+        update_metrics_transfered_bytes(n);
+
 
         if (ATTACHMENT(key)->external_process != -1 && ATTACHMENT(key)->has_filtered_entire_mail) {
                 finish_external_process(key);
@@ -1033,7 +1024,7 @@ static unsigned response_write(struct selector_key *key){
             selector_status ss = SELECTOR_SUCCESS;
             ss |= selector_set_interest_key(key, OP_NOOP);
             if(strcmp((char*)d->wb->limit, "quit\n") == 0){
-                metrics->concurrent_connections--;
+                update_metrics_end_connection();
                 return DONE;
             } else if (buffer_can_read(b)) {
                 ss |= selector_set_interest_key(key, OP_NOOP);
@@ -1104,6 +1095,7 @@ error_write(struct selector_key *key) {
 
   ptr = buffer_read_ptr(err_st->write_buffer, &count);
   n   = send(key->fd, ptr, count, MSG_NOSIGNAL);
+  update_metrics_transfered_bytes(n);
   if(n > 0) {
     buffer_read_adv(err_st->write_buffer, n);
     if (!buffer_can_read(err_st->write_buffer) && len == 0) {
@@ -1115,57 +1107,6 @@ error_write(struct selector_key *key) {
 }
 
 ///////      FILTER      ///////
-
-// static void
-// start_external_filter_process(struct selector_key *key){
-
-//     if(ATTACHMENT(key)->external_process)
-//         return;
-//     if(pipe(ATTACHMENT(key)->write_to_filter_fds) == -1 || 
-//         pipe(ATTACHMENT(key)->read_from_filter_fds) == -1) {
-//         printf("%s failed to create pipes. %s", TRANSFORMATION_START_ERR_MSG, EXIT_MSG);
-//         exit(1);
-//     }
-
-//     ATTACHMENT(key)->external_process = fork();
-//     if(ATTACHMENT(key)->external_process == -1) {
-//         printf("%s failed to start external process. %s", TRANSFORMATION_START_ERR_MSG, EXIT_MSG);
-//         exit(1);
-//     }
-//     else if(ATTACHMENT(key)->external_process == 0) {
-//         logger(INFO, "Running transformation on email", get_time());
-
-//         close(ATTACHMENT(key)->write_to_filter_fds[1]);
-//         close(ATTACHMENT(key)->read_from_filter_fds[0]);
-
-//         if(dup2(ATTACHMENT(key)->write_to_filter_fds[0], STDIN_FILENO) == -1 || 
-//             dup2(ATTACHMENT(key)->read_from_filter_fds[1], STDOUT_FILENO) == -1) {
-//             printf("%s failed to create pipes. %s", TRANSFORMATION_START_ERR_MSG, EXIT_MSG);
-//             exit(1);
-//         }
-
-//         char* env_command = malloc(strlen("FILTER_MEDIAS=") + 40);
-//         strcpy(env_command, "FILTER_MEDIAS=");
-//         strcat(env_command, options->media_types);
-//         putenv(env_command);
-//         putenv("FILTER_MSG=[[REDACTED]]");
-
-//         execl("/bin/bash", "sh", "-c", options->cmd, NULL);
-//     } else {
-//         close(ATTACHMENT(key)->write_to_filter_fds[0]);
-//         close(ATTACHMENT(key)->read_from_filter_fds[1]);
-
-//          selector_status ss = SELECTOR_SUCCESS;
-//         ss |= selector_register(key->s, ATTACHMENT(key)->write_to_filter_fds[1], &pop3_handler,
-//                                     OP_WRITE, key->data);
-
-//         ss |= selector_register(key->s, ATTACHMENT(key)->read_from_filter_fds[0], &pop3_handler,
-//                                     OP_READ, key->data);
-
-//         selector_fd_set_nio(ATTACHMENT(key)->write_to_filter_fds[1]);
-//         selector_fd_set_nio(ATTACHMENT(key)->read_from_filter_fds[0]); 
-//     }
-// }
 
 static void
 filter_init(const unsigned state, struct selector_key *key) 

@@ -4,7 +4,7 @@ GREEN = \e[92m
 NORMAL = \e[0m
 FILES=./*.c
 EXEC_NAME = pop3ctl
-DEBUG_EXEC = admin_debug
+DEBUG_EXEC = pop3ctl_debug
 all: 
 	@echo "$(GREEN)Compiling ...$(NORMAL)"
 	$(CC) $(CFLAGS) $(FILES) -o $(EXEC_NAME) -lsctp

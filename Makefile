@@ -8,6 +8,8 @@ DEBUG_NAME = pop3filter_debug
 all: 
 	@echo "$(GREEN)Compiling ...$(NORMAL)"
 	$(CC) $(CFLAGS) $(FILES) -o $(EXEC_NAME) -lsctp
+	$(MAKE) -C admin/
+	$(MAKE) -C mr-mime/
 	@echo "$(GREEN)Done!$(NORMAL)"
 
 strict:
