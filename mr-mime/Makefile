@@ -5,7 +5,7 @@ all:
 	@echo "$(GREEN)Done!$(NORMAL)"
 
 clean:
-	$(RM) mime_filter
+	$(RM) stripmime 
 
 run:
-	./mime_filter
+	./stripmime
