@@ -664,6 +664,7 @@ static void parse_and_queue_commands(struct selector_key *key, buffer *buff, ssi
             n-=i;
             if(aux_cmd[i-1] == '\r')
                 printf("new r");
+            aux_cmd[i] = '\n';
             add_element(requests,aux_cmd);
         }
     }
