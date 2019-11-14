@@ -1023,7 +1023,10 @@ start_external_filter_process(struct selector_key *key){
             exit(1);
         }
 
-        putenv("FILTER_MEDIAS=text/plain");
+        char* env_command = malloc(strlen("FILTER_MEDIAS=") + 40);
+        strcpy(env_command, "FILTER_MEDIAS=");
+        strcat(env_command, options->media_types);
+        putenv(env_command);
         putenv("FILTER_MSG=[[REDACTED]]");
 
         execl("/bin/bash", "sh", "-c", options->cmd, NULL);
