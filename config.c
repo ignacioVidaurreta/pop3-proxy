@@ -41,7 +41,7 @@ void initialize_config(){
     ((struct sockaddr_in*) &options->management_address)->sin_port        = htons(options->local_port);
 
     options->string_management_address = calloc(20, sizeof(char));
-    options->string_management_address = calloc(20, sizeof(char));
+    options->string_proxy_address = calloc(20, sizeof(char));
 
     options->cmd = malloc(100);
     memcpy(options->cmd, "cat", strlen("cat")+1);
@@ -168,7 +168,7 @@ void set_proxy_address(char* address){
 void update_config(const int argc, char* const* argv){
     int opt;
 
-    while((opt = getopt(argc, argv, "p:P:o:c:vhe:l:L:m:M:t")) != -1){
+    while((opt = getopt(argc, argv, "p:P:o:c:vhe:l:L:m:M:t:")) != -1){
         switch(opt){
             case 'p':
                 change_port(&options->local_port, optarg);
@@ -225,5 +225,8 @@ void free_config(){
     free(options->string_management_address);
     free(options->string_proxy_address);
     free(options->cmd);
+    free(options->media_types);
+    free(options->string_management_address);
+    free(options->string_proxy_address);
     free(options);
 }

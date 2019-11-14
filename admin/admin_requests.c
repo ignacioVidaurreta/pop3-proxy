@@ -79,8 +79,8 @@ void print_commands(){
     printf("> 'help' To display this very useful message\n");
     printf("> 'quit' To exit the manager\n");
     printf("> 'connections' To get the number of concurrent connections\n");
-    printf("> 'get_transformation'[WIP] Get current active transformation\n");
-    printf("> 'set_transformation'[WIP] Change current active transformation\n");
+    printf("> 'get_transformation' Get current active transformation\n");
+    printf("> 'set_transformation' Change current active transformation\n");
     printf("> 'bytes' To get number of transferred bytes\n");
 }
 
