@@ -618,7 +618,6 @@ static void parse_and_queue_commands(struct selector_key *key, buffer *buff, ssi
             i++;
             enum request_state next;
             char c = buffer_read(buff);
-            fprintf(stderr, "char<%c>\n", c);
 
             if(empty_cmd && (c == '\r' || c == '\n'))
                 break;
@@ -660,7 +659,6 @@ static void parse_and_queue_commands(struct selector_key *key, buffer *buff, ssi
             state = next;
     }
         if(!empty_cmd){
-            fprintf(stderr, "CMD:<%s>",aux_cmd);
             n-=i;
             if(aux_cmd[i-1] == '\r')
                 printf("new r");
@@ -712,7 +710,6 @@ static ssize_t send_next_request(struct selector_key *key) {
     uint8_t * request_string = (uint8_t *)peek(q);
 
     if(request_string == NULL){
-        fprintf(stderr, "No request_string found\n");
         return 0;
     }
 
@@ -724,7 +721,6 @@ static ssize_t send_next_request(struct selector_key *key) {
     while (aux_n == 0) {
         i++;
         char c = request_string[i-1];
-        //fprintf(stderr, "%x ", c);
         if(isdigit((int)c) || isalpha((int)c) || c == '\n' || c == '\r' || c == ' '){
             if(c == '\n'){
                 aux_n = i;
@@ -734,7 +730,6 @@ static ssize_t send_next_request(struct selector_key *key) {
 
     }
 
-    //fprintf(stderr, "\n");
 
     uint8_t *cptr;
     size_t count;
@@ -855,12 +850,6 @@ static unsigned response_read(struct selector_key *key){
     size_t  count;
     ssize_t  n;
 
-    // fprintf(stderr, "TU FIEJAAA should be 1:%d\n", is_retr_command("RETR 2"));
-    // fprintf(stderr, "TU FIEJAAA should be 1:%d\n", is_retr_command("RETR 232"));
-    // fprintf(stderr, "TU FIEJAAA should be 0:%d\n", is_retr_command("RETR 2d"));
-    // fprintf(stderr, "TU FIEJAAA should be 0:%d\n", is_retr_command(" RETR 2"));
-    // fprintf(stderr, "TU FIEJAAA should be 0:%d\n", is_retr_command("RET 2"));
-    // fprintf(stderr, "TU FIEJAAA should be 0:%d\n", is_retr_command("RETR2"));
 
     if (is_retr_command(latest_request)){
         ptr = buffer_write_ptr(b, &count);
