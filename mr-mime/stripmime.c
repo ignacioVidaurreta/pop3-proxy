@@ -495,6 +495,7 @@ pop3_multi(struct ctx *ctx, const uint8_t c) {
                 if( ctx->output_enabled != NULL && *ctx->output_enabled) {
                     for(int i = 0; i < e->n; i++) {
                         printf("%c", e->data[i]);
+                        //fprintf(stderr, "%c", e->data[i]);
                     }
                 }
                 break;
@@ -525,10 +526,13 @@ main(const int argc, const char **argv) {
 
 
     char *replacement_text = getenv("FILTER_MSG");
-    char *aux_replacement_text = "[[This content has been blocked due to security reasons.]]";
+    //char *replacement_text = "[[REDACTED]]";
+    char *aux_replacement_text = "[[This content has been blocked by the Proxy filter]]";
     char *blocked_type    = getenv("FILTER_MEDIAS");
+    //char *blocked_type    = "text/plain";
+
     if (blocked_type == NULL){
-        perror("Please set the FILTER_MEDIAS environment variable before running the filter :)");
+        fprintf(stderr, "Please set the FILTER_MEDIAS environment variable before running the filter :)");
         return 1;
     }
 
@@ -574,6 +578,9 @@ main(const int argc, const char **argv) {
             pop3_multi(&ctx, data[i]);
         }
     } while(n > 0);
+
+    printf("\r\n.\r\n");
+
     for(int i=0; i<1024; i++) {
         free(ctx.boundaries[i]);
     }
