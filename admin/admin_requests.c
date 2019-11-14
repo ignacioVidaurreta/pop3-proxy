@@ -33,7 +33,6 @@ void print_error_msg(uint8_t error_code){
 }
 bool handle_user(char *user, int connSock) {
     uint8_t command = 0x00, nargs = 1;
-    int ret;
     uint8_t datagram[MAX_DATAGRAM_SIZE];
     uint8_t response[MAX_DATAGRAM_SIZE];
 
@@ -43,10 +42,10 @@ bool handle_user(char *user, int connSock) {
     datagram[2] = length;
     memcpy(datagram + 3, user, length);
 
-    ret = sctp_sendmsg(connSock, (const void *) datagram, 3 + length,
+    sctp_sendmsg(connSock, (const void *) datagram, 3 + length,
                        NULL, 0, 0, 0, STREAM, 0, 0);
 
-    ret = sctp_recvmsg(connSock, (void *) response, MAX_DATAGRAM_SIZE,
+    sctp_recvmsg(connSock, (void *) response, MAX_DATAGRAM_SIZE,
                        (struct sockaddr *) NULL, 0, 0, 0);
     if (response[0] != 0)  {
         return false;
@@ -56,7 +55,6 @@ bool handle_user(char *user, int connSock) {
 
 bool handle_password(char * password, int conn_sock){
     uint8_t command = 0x01, nargs = 1;
-    int ret;
     uint8_t datagram[MAX_DATAGRAM_SIZE];
     uint8_t response[MAX_DATAGRAM_SIZE];
 
@@ -65,9 +63,9 @@ bool handle_password(char * password, int conn_sock){
     size_t length = strlen(password);
     datagram[2] = length;
     memcpy(datagram + 3, password, length);
-    ret = sctp_sendmsg(conn_sock, (const void *) datagram, 3 + length,
+    sctp_sendmsg(conn_sock, (const void *) datagram, 3 + length,
                        NULL, 0, 0, 0, STREAM, 0, 0);
-    ret = sctp_recvmsg(conn_sock, (void *) response, MAX_DATAGRAM_SIZE,
+    sctp_recvmsg(conn_sock, (void *) response, MAX_DATAGRAM_SIZE,
                        (struct sockaddr *) NULL, 0, 0, 0);
     
     return response[0] == 0;
@@ -85,14 +83,13 @@ void print_commands(){
 }
 
 void send_msg_no_arguments(int conn_sock, char* fmt, uint8_t command, uint8_t nargs){
-    int ret;
     uint8_t datagram[MAX_DATAGRAM_SIZE];
     uint8_t response[MAX_DATAGRAM_SIZE];
     datagram[0] = command;
     datagram[1] = nargs;
-    ret = sctp_sendmsg(conn_sock, (const void *) datagram, 2,
+    sctp_sendmsg(conn_sock, (const void *) datagram, 2,
                        NULL, 0, 0, 0, STREAM, 0, 0);
-    ret = sctp_recvmsg(conn_sock, (void *) response, MAX_DATAGRAM_SIZE,
+    sctp_recvmsg(conn_sock, (void *) response, MAX_DATAGRAM_SIZE,
                        (struct sockaddr *) NULL, 0, 0, 0);
     if (response[0] == 0) {
         char data[response[1] + 1];
@@ -110,7 +107,6 @@ void set_active_transformation(int conn_sock){
     uint8_t arg_size = 0;
     int exit = 1;
     uint8_t command = 0x03, nargs = 1;
-    int ret;
     uint8_t datagram[MAX_DATAGRAM_SIZE];
     uint8_t res[MAX_DATAGRAM_SIZE];
     char buffer[256];
@@ -128,16 +124,15 @@ void set_active_transformation(int conn_sock){
             memcpy(datagram + 3, buffer, arg_size);
         }
     }
-    ret = sctp_sendmsg(conn_sock, (const void *) datagram, arg_size + 3,
+    sctp_sendmsg(conn_sock, (const void *) datagram, arg_size + 3,
                         NULL, 0, 0, 0, STREAM, 0, 0);
-    ret = sctp_recvmsg(conn_sock, (void *) res, MAX_DATAGRAM_SIZE,
+    sctp_recvmsg(conn_sock, (void *) res, MAX_DATAGRAM_SIZE,
                         (struct sockaddr *) NULL, 0, 0, 0);
     if (res[0] == 0x00) {
         printf("Transformation set \n");
     } else {
         print_error_msg(res[0]);
     }
-    return 0;
 
 }
 

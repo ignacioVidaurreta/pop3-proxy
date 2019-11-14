@@ -11,6 +11,11 @@ struct response_st {
     int                     *fd;
 };
 
+struct error_st {
+    char* error_msg;
+    buffer* write_buffer;
+};
+
 enum request_cmd_type {
             RETR,
             LIST,
@@ -122,6 +127,7 @@ enum pop3_state {
     // estados terminales
     DONE,
     ERROR,
+    ERROR_WITH_MSG
 };
 
 /*
@@ -160,7 +166,7 @@ struct pop3 {
     /** estados para el client_fd */
     union {
         struct request_st         request;
-        // struct error_st           error;
+        struct error_st           error;
     } client;
 
     queue * requests;
@@ -199,6 +205,7 @@ void pop3filter_passive_accept();
 void pop3_destroy(struct pop3 *state);
 void assign_cmd(struct selector_key *key, char *cmd, int cmds_read);
 void free_resources();
+unsigned send_error_msg(struct selector_key* key);
 
 
 
