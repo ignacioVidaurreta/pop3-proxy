@@ -9,5 +9,3 @@ all:
 clean:
 	$(RM) $(EXEC_NAME)
 
-run:
-	./$(EXEC_NAME)
