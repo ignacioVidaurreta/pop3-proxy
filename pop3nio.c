@@ -607,14 +607,14 @@ static void parse_and_queue_commands(struct selector_key *key, buffer *buff, ssi
     if (!buffer_can_read(buff))
         return;
     enum request_state state = request_cmd;
-    while (buffer_can_read(buff) && n > 0 && state != request_done) {
+    while (buffer_can_read(buff) && n > 0) {
         state = request_cmd;
         uint8_t * aux_cmd = malloc(100);
         memset(aux_cmd, 0, 100);
-        ssize_t aux_n = 0;
+//        ssize_t aux_n = 0;
         size_t i = 0;
         bool empty_cmd = true;
-        while (buffer_can_read(buff) && aux_n == 0) {
+        while (buffer_can_read(buff) && state!=request_done) {
             i++;
             enum request_state next;
             char c = buffer_read(buff);
@@ -646,7 +646,7 @@ static void parse_and_queue_commands(struct selector_key *key, buffer *buff, ssi
                     next = newline(c);
                     break;
                 case request_done:
-                    aux_n = i;
+                    //aux_n = i;
                     break;
                 case request_error:
                     print_error("ERROR", get_time());
@@ -981,7 +981,7 @@ void error_print(){
     printf("THERE HAS BEEN AN ERROR");
 }
 
-///////      RESPONSE      ///////
+///////      FILTER      ///////
 
 static void
 start_external_filter_process(struct selector_key *key){
