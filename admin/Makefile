@@ -3,7 +3,7 @@ CFLAGS = -pthread -std=c99 -pedantic -Wall -D_POSIX_C_SOURCE=200112L -D_XOPEN_SO
 GREEN = \e[92m
 NORMAL = \e[0m
 FILES=./*.c
-EXEC_NAME = admin 
+EXEC_NAME = pop3ctl
 DEBUG_EXEC = admin_debug
 all: 
 	@echo "$(GREEN)Compiling ...$(NORMAL)"
