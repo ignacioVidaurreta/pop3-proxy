@@ -40,7 +40,7 @@ void initialize_config(){
     ((struct sockaddr_in*) &options->management_address)->sin_port        = htons(options->local_port);
 
     options->string_management_address = calloc(20, sizeof(char));
-    options->string_management_address = calloc(20, sizeof(char));
+    options->string_proxy_address = calloc(20, sizeof(char));
 
     options->cmd = malloc(CAT_SIZE*sizeof(char));
     memcpy(options->cmd, "cat", CAT_SIZE);
@@ -224,5 +224,8 @@ void free_config(){
     free(options->string_management_address);
     free(options->string_proxy_address);
     free(options->cmd);
+    free(options->media_types);
+    free(options->string_management_address);
+    free(options->string_proxy_address);
     free(options);
 }
