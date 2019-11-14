@@ -44,7 +44,7 @@ void initialize_config(){
     options->string_proxy_address = calloc(20, sizeof(char));
 
     options->cmd = malloc(100);
-    memcpy(options->cmd, "cat", strlen("cat")+1);
+    memcpy(options->cmd, "./mime_filter", strlen("./mime_filter")+1);
 
     options->media_types = malloc(20 * sizeof(char));
     strcpy(options->media_types, "text/html");
