@@ -7,6 +7,7 @@ static uint16_t parse_port(const char * port);
 void print_usage();
 bool is_valid_username(char* username);
 bool is_valid_password(char* pass);
+void get_transferred_bytes(int conn_sock);
 
 
 #endif /* PC_2019B_01_ADMIN_H */

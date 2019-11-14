@@ -75,18 +75,9 @@ bool is_valid_password(char* pass){
 
 int main(int argc, char* const* argv){
     printf("------------- PROXY ADMIN CLIENT ------------- \n\n");
-    int conn_sock, in, i, ret, flags;
-    int * position;
-    struct sockaddr_in servaddr;
-
-    // Things that sctp needs
-    struct sctp_status status;
-    struct sctp_sndrcvinfo sndrcvinfo;
-    struct sctp_event_subscribe events;
-    struct sctp_initmsg initmsg;
+    int conn_sock, ret;
 
     char buffer[BUFFER];
-    position= 0;
 
     uint16_t port = DEFAULT_PORT;
     char * address = DEFAULT_ADDRESS;
