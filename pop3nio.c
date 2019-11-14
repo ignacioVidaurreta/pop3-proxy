@@ -568,23 +568,23 @@ newline(const uint8_t c) {
     return request_done;
 }
 
-static enum request_state
-param(const uint8_t c, uint8_t * aux_cmd, int index) {
-    enum request_state ret = request_param;
+// static enum request_state
+// param(const uint8_t c, uint8_t * aux_cmd, int index) {
+//     enum request_state ret = request_param;
 
-    if (c == '\r' || c == '\n') {
-        if (c == '\r') {
-            ret = request_newline;
-        } else {
-            ret = request_done;
-        }
+//     if (c == '\r' || c == '\n') {
+//         if (c == '\r') {
+//             ret = request_newline;
+//         } else {
+//             ret = request_done;
+//         }
 
-    } else {
-        aux_cmd[index] = c;
-    }
+//     } else {
+//         aux_cmd[index] = c;
+//     }
 
-    return ret;
-}
+//     return ret;
+// }
 
 enum request_state cmd(char c, uint8_t * aux_cmd, int index){
      enum request_state ret = request_cmd;
@@ -836,7 +836,7 @@ bool is_retr_command(uint8_t* cmd_string){
         if (tolower(cmd_string[i]) != retr_string[i])
             return false;
     }
-    while (i < strlen(cmd_string) && cmd_string[i] != '\n'){
+    while (i < strlen((char*)cmd_string) && cmd_string[i] != '\n'){
         if (!isdigit(cmd_string[i++]))
             return false;
     }
@@ -928,7 +928,7 @@ send_to_server(struct selector_key *key, buffer * b) {
 /** Escribe la respuesta en el cliente */
 static unsigned response_write(struct selector_key *key){
     struct response_st *d = &ATTACHMENT(key)->origin.response;
-    struct filter_st *filter = &ATTACHMENT(key)->filter;
+    struct filter_st *filter = (struct filter_st *) &ATTACHMENT(key)->filter;
     enum pop3_state ret = RESPONSE;
 
     buffer  *b = d->rb;
@@ -937,11 +937,9 @@ static unsigned response_write(struct selector_key *key){
     if (ATTACHMENT(key)->has_filtered_mail){
         uint8_t *ptr;
         size_t count;
-        ssize_t n = 0;
         ptr = buffer_read_ptr(filter->filtered_mail_buffer, &count);
 
         n = send(ATTACHMENT(key)->client_fd, ptr, count, MSG_NOSIGNAL);
-
     } else {
         n = send_to_server(key, b);
     }
@@ -1028,7 +1026,7 @@ start_external_filter_process(struct selector_key *key){
         putenv("FILTER_MEDIAS=text/plain");
         putenv("FILTER_MSG=[[REDACTED]]");
 
-        execl("/bin/sh", "sh", "-c", options->cmd, NULL);
+        execl("/bin/bash", "sh", "-c", options->cmd, NULL);
     } else {
         close(ATTACHMENT(key)->write_to_filter_fds[0]);
         close(ATTACHMENT(key)->read_from_filter_fds[1]);
@@ -1040,21 +1038,15 @@ start_external_filter_process(struct selector_key *key){
         ss |= selector_register(key->s, ATTACHMENT(key)->read_from_filter_fds[0], &pop3_handler,
                                     OP_READ, key->data);
 
-        if (selector_fd_set_nio(ATTACHMENT(key)->write_to_filter_fds[1]) == -1 ||
-            selector_fd_set_nio(ATTACHMENT(key)->read_from_filter_fds[0]) == -1) {
-            return -1;
-        }
+        selector_fd_set_nio(ATTACHMENT(key)->write_to_filter_fds[1]);
+        selector_fd_set_nio(ATTACHMENT(key)->read_from_filter_fds[0]); 
     }
-
-
-
-    
 }
 
 static void
 filter_init(const unsigned state, struct selector_key *key) 
 {
-    struct filter_st * filter = &ATTACHMENT(key)->filter;
+    struct filter_st * filter = (struct filter_st *) &ATTACHMENT(key)->filter;
     
     filter->original_mail_buffer = &(ATTACHMENT(key)->read_buffer);
     filter->filtered_mail_buffer = &(ATTACHMENT(key)->write_buffer);
@@ -1062,7 +1054,7 @@ filter_init(const unsigned state, struct selector_key *key)
 }
 
 int write_buffer_to_filter(struct selector_key *key, buffer* buff){
-    struct filter_st * filter = &ATTACHMENT(key)->filter;
+    struct filter_st * filter = (struct filter_st *) &ATTACHMENT(key)->filter;
     buffer *sb = filter->write_buffer;
     uint8_t *sptr;
 
@@ -1103,7 +1095,7 @@ int read_transformation(struct selector_key *key, buffer* buff) {
 static unsigned
 filter_send(struct selector_key *key) 
 {
-    struct filter_st *d = &ATTACHMENT(key)->filter;
+    struct filter_st *d = (struct filter_st *) &ATTACHMENT(key)->filter;
     enum pop3_state ret;
 
     buffer  *b         = d->original_mail_buffer;
@@ -1137,7 +1129,7 @@ filter_send(struct selector_key *key)
 static unsigned
 filter_recv(struct selector_key *key) 
 {
-    struct filter_st *d = &ATTACHMENT(key)->filter;
+    struct filter_st *d = (struct filter_st *) &ATTACHMENT(key)->filter;
     enum pop3_state ret = FILTER;
 
     buffer  *b = d->filtered_mail_buffer;

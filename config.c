@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <getopt.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include "include/config.h"
 #include "include/pop3.h"
@@ -42,8 +43,8 @@ void initialize_config(){
     options->string_management_address = calloc(20, sizeof(char));
     options->string_management_address = calloc(20, sizeof(char));
 
-    options->cmd = malloc(CAT_SIZE*sizeof(char));
-    memcpy(options->cmd, "cat", CAT_SIZE);
+    options->cmd = malloc(100);
+    memcpy(options->cmd, "cat", strlen("cat")+1);
 
     options->media_types = malloc(20 * sizeof(char));
     strcpy(options->media_types, "text/html");

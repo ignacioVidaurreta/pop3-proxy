@@ -169,14 +169,14 @@ static void management_write(struct selector_key *key) {
     }
 }
 
-static void management_block(struct selector_key *key) {
-    struct state_machine *stm   = &ATTACHMENT(key)->stm;
-    const enum management_state st = stm_handler_block(stm, key);
+// static void management_block(struct selector_key *key) {
+//     struct state_machine *stm   = &ATTACHMENT(key)->stm;
+//     const enum management_state st = stm_handler_block(stm, key);
 
-    if(st == ERROR || st == DONE) {
-        management_done(key);
-    }
-}
+//     if(st == ERROR || st == DONE) {
+//         management_done(key);
+//     }
+// }
 
 static void management_close(struct selector_key *key) {
     management_destroy(ATTACHMENT(key));
@@ -216,37 +216,10 @@ bool request_is_done(int state, bool* error ){
     return state >= READING_DONE;
 }
 
-static unsigned user_read(struct selector_key *key) {
-    struct management *management = ATTACHMENT(key);
-
-    buffer *read_buffer     = &management->read_buffer;
-    unsigned  ret   = READING_USER;
-    bool  error = false;
-
-    uint8_t *ptr;
-    size_t  count;
-    ssize_t  n;
-
-    ptr = buffer_write_ptr(read_buffer, &count);
-    n = sctp_recvmsg(key->fd, ptr, count, 0, 0, &sndrcvinfo, &sctp_flags);
-    if(n > 0) {
-        buffer_write_adv(read_buffer, n);
-        int state = parse_input(read_buffer, &management->parser, &error);
-        if(request_is_done(state, 0)){
-            ret = user_process(key);
-        }
-    } else {
-        ret = ERROR;
-    }
-
-    return error ? ERROR : ret;
-}
-
-static unsigned user_process(struct selector_key *key) {
+unsigned user_process(struct selector_key *key) {
     struct management *management = ATTACHMENT(key);
     unsigned ret = WRITING_USER;
 
-    struct spcp_request *request = &management->parser.request;
     if(management->username == NULL)
         management->username = malloc(management->parser.request.arg0_size + 1);
     else
@@ -274,6 +247,32 @@ static unsigned user_process(struct selector_key *key) {
         return ERROR;
     }
     return ret;
+}
+
+static unsigned user_read(struct selector_key *key) {
+    struct management *management = ATTACHMENT(key);
+
+    buffer *read_buffer     = &management->read_buffer;
+    unsigned  ret   = READING_USER;
+    bool  error = false;
+
+    uint8_t *ptr;
+    size_t  count;
+    ssize_t  n;
+
+    ptr = buffer_write_ptr(read_buffer, &count);
+    n = sctp_recvmsg(key->fd, ptr, count, 0, 0, &sndrcvinfo, &sctp_flags);
+    if(n > 0) {
+        buffer_write_adv(read_buffer, n);
+        int state = parse_input(read_buffer, &management->parser, &error);
+        if(request_is_done(state, 0)){
+            ret = user_process(key);
+        }
+    } else {
+        ret = ERROR;
+    }
+
+    return error ? ERROR : ret;
 }
 
 static unsigned user_confirm(struct selector_key *key) {
