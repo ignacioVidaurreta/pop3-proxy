@@ -167,7 +167,7 @@ void set_proxy_address(char* address){
 void update_config(const int argc, char* const* argv){
     int opt;
 
-    while((opt = getopt(argc, argv, "p:P:o:c:vhe:l:L:m:M:t")) != -1){
+    while((opt = getopt(argc, argv, "p:P:o:c:vhe:l:L:m:M:t:")) != -1){
         switch(opt){
             case 'p':
                 change_port(&options->local_port, optarg);
