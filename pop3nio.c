@@ -73,7 +73,7 @@ pop3_new(int client_fd){
     ret->client_addr_len = sizeof(ret->client_addr);
 
     ret->stm    .initial   = RESOLVE;
-    ret->stm    .max_state = ERROR;
+    ret->stm    .max_state = ERROR_WITH_MSG;
     ret->stm    .states    = pop3_describe_states();
     stm_init(&ret->stm);
 
@@ -196,8 +196,7 @@ static void pop3_done(struct selector_key* key) {
     for(unsigned i = 0; i < N(fds); i++) {
         if(fds[i] != -1) {
             if(selector_unregister_fd(key->s, fds[i]) != SELECTOR_SUCCESS ) {
-                print_error("Connection refused. No origin service running", get_time());
-                exit(0);
+                perror("Error: ");
             }
             close(fds[i]);
         }
@@ -328,7 +327,6 @@ error:
 }
 
 ///////      CONNECTING      ///////
-
 static unsigned connecting(struct selector_key *key) {
     struct pop3 *p = ATTACHMENT(key);
     int error;
@@ -337,17 +335,13 @@ static unsigned connecting(struct selector_key *key) {
     p->origin_fd = key->fd;
 
     if (getsockopt(key->fd, SOL_SOCKET, SO_ERROR, &error, &len) < 0) {
-        p->error = "Connection refused (while connecting to origin server).";
-        selector_set_interest_key(key, OP_NOOP);
         return ERROR;
     } else {
         if (error == 0) {
             p->origin_fd = key->fd;
         } else {
-            selector_unregister_fd(key->s, key->fd);
-            close(key->fd);
-            p->error = "Connection refused (while connecting to origin server).";
-            return ERROR;
+            print_error("Connection refused (while connecting to origin server).", get_time());
+            return ERROR_WITH_MSG;
         }
     }
 
@@ -989,8 +983,52 @@ static unsigned response_write(struct selector_key *key){
     return ret;
 }
 
-void error_print(){
-    printf("THERE HAS BEEN AN ERROR");
+void show_error(const unsigned state, struct selector_key *key){
+    printf("THERE HAS BEEN AN ERROR\n");
+}
+
+///////     ERROR_WITH_WRITE       ///////
+
+static void
+error_init(const unsigned state, struct selector_key *key) {
+  struct pop3      *p =  ATTACHMENT(key);
+  struct error_st* err_st = &p->client.error;
+  err_st->error_msg     = "-ERR Connection refused";
+  err_st->write_buffer  = &(p->request_buffer);
+
+  selector_set_interest(key->s, p->client_fd, OP_WRITE);
+}
+
+static unsigned
+error_write(struct selector_key *key) {
+  struct pop3     *p  =  ATTACHMENT(key);
+  struct error_st *err_st  = &p->client.error;
+  unsigned        ret = ERROR_WITH_MSG;
+
+  uint8_t *ptr;
+  size_t  count;
+  ssize_t  n;
+  int len = strlen(err_st->error_msg);
+
+  if(len > 0) {
+    ptr = buffer_write_ptr(err_st->write_buffer, &count);
+    count = count >= len ? len : count;
+    memcpy(ptr, err_st->error_msg, count);
+    buffer_write_adv(err_st->write_buffer, count);
+    len -= count;
+    err_st->error_msg += count;
+  }
+
+  ptr = buffer_read_ptr(err_st->write_buffer, &count);
+  n   = send(key->fd, ptr, count, MSG_NOSIGNAL);
+  if(n > 0) {
+    buffer_read_adv(err_st->write_buffer, n);
+    if (!buffer_can_read(err_st->write_buffer) && len == 0) {
+      ret = ERROR;
+    }
+  }
+
+  return ret;
 }
 
 ///////      FILTER      ///////
@@ -1202,8 +1240,13 @@ static const struct state_definition client_statbl[] = {
      {
         .state            = DONE,
     },{
-        .state            = ERROR,
-        .on_arrival       = error_print,
+        .state           = ERROR,
+        .on_arrival      = show_error,
+    },
+    {
+        .state            = ERROR_WITH_MSG,
+        .on_arrival       = error_init,
+        .on_write_ready   = error_write,
     }
 };
 
