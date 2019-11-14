@@ -10,6 +10,7 @@
 #include <sys/wait.h>
 #include <pthread.h>
 #include <poll.h>
+#include <ctype.h>
 
 
 #include "include/pop3nio.h"
@@ -543,31 +544,134 @@ static void request_init(const unsigned state, struct selector_key *key) {
 
 }
 
+enum request_state {
+    request_cmd,
+    request_param,
+    request_newline,
+
+    // apartir de aca están done
+    request_done,
+
+    // y apartir de aca son considerado con error
+    request_error,
+    request_error_cmd_too_long,
+    request_error_param_too_long,
+};
+
+static enum request_state
+newline(const uint8_t c) {
+
+    if (c != '\n') {
+        return request_error;
+    }
+
+    return request_done;
+}
+
+static enum request_state
+param(const uint8_t c, uint8_t * aux_cmd, int index) {
+    enum request_state ret = request_param;
+
+    if (c == '\r' || c == '\n') {
+        if (c == '\r') {
+            ret = request_newline;
+        } else {
+            ret = request_done;
+        }
+
+    } else {
+        aux_cmd[index] = c;
+    }
+
+    return ret;
+}
+
+enum request_state cmd(char c, uint8_t * aux_cmd, int index){
+     enum request_state ret = request_cmd;
+
+    aux_cmd[index] = c;
+
+    if (c == ' ' || c == '\r' || c == '\n') {   // aceptamos comandos terminados en '\r\n' y '\n'
+        if (c == ' ') {
+            ret = request_param;
+        } else if (c == '\r'){
+            ret = request_newline;
+        } else {
+            ret = request_done;
+        }
+    }
+
+    return ret;
+}
+
 static void parse_and_queue_commands(struct selector_key *key, buffer *buff, ssize_t  n ) {
     queue * requests = ATTACHMENT(key)->requests;
 
     if (!buffer_can_read(buff))
         return;
-
+    enum request_state state = request_cmd;
     while (buffer_can_read(buff) && n > 0) {
-        uint8_t * aux_cmd = malloc(512);
-        memset(aux_cmd, 0, 512);
-        ssize_t aux_n = 0;
+        state = request_cmd;
+        uint8_t * aux_cmd = malloc(100);
+        memset(aux_cmd, 0, 100);
+//        ssize_t aux_n = 0;
         size_t i = 0;
-        while (buffer_can_read(buff) && aux_n == 0) {
+        bool empty_cmd = true;
+        while (buffer_can_read(buff) && state!=request_done) {
             i++;
+            enum request_state next;
             char c = buffer_read(buff);
-            if (c == '\n') {
-                aux_n = i;
-            }
-           aux_cmd[i-1] = c;
-        }
 
-        n-=i;
-        add_element(requests,aux_cmd);
+            if(empty_cmd && (c == '\r' || c == '\n'))
+                break;
+            else
+                empty_cmd = false;
+           
+
+            switch(state) {
+                case request_cmd:
+                    next = cmd(c, aux_cmd, i-1);
+                    break;
+                case request_param:
+                    aux_cmd[i-1] = c;
+                    next = request_param;
+                    if (c == '\r' || c == '\n') {
+                        if (c == '\r') {
+                            next = request_newline;
+                        } else {
+                            next = request_done;
+                        }
+
+                    }
+                    break;
+                case request_newline:
+                    next = newline(c);
+                    break;
+                case request_done:
+                    //aux_n = i;
+                    break;
+                case request_error:
+                    print_error("ERROR", get_time());
+                    continue;
+                    break;
+                default:
+                    next = request_error;
+                    break;
+            }
+
+            state = next;
+    }
+        if(!empty_cmd){
+            n-=i;
+            if(aux_cmd[i-1] == '\r')
+                printf("new r");
+            aux_cmd[i] = '\n';
+            add_element(requests,aux_cmd);
+        }
     }
 
 }
+
 
 /** Lee la request del cliente */
 static unsigned request_read(struct selector_key *key){
@@ -599,12 +703,19 @@ static unsigned request_read(struct selector_key *key){
     if(ret == ERROR) {
         print_error("Error reading from client", get_time());
     }
+    //memset(ptr, 0, strlen((char*)ptr));
+    buffer_reset(buff);
     return ret;
 }
 
 static ssize_t send_next_request(struct selector_key *key) {
     queue * q = ATTACHMENT(key)->requests;
     uint8_t * request_string = (uint8_t *)peek(q);
+
+    if(request_string == NULL){
+        return 0;
+    }
+
     struct request_st *d = &ATTACHMENT(key)->client.request;
     buffer *buff            = d->aux_buffer;
     ssize_t aux_n = 0;
@@ -613,11 +724,15 @@ static ssize_t send_next_request(struct selector_key *key) {
     while (aux_n == 0) {
         i++;
         char c = request_string[i-1];
-        if (c == '\n') {
-            aux_n = i;
+        if(isdigit((int)c) || isalpha((int)c) || c == '\n' || c == '\r' || c == ' '){
+            if(c == '\n'){
+                aux_n = i;
+            }
+            buffer_write(buff, c);
         }
-        buffer_write(buff, c);
+
     }
+
 
     uint8_t *cptr;
     size_t count;
@@ -745,12 +860,6 @@ static unsigned response_read(struct selector_key *key){
     size_t  count;
     ssize_t  n;
 
-    // fprintf(stderr, "TU FIEJAAA should be 1:%d\n", is_retr_command("RETR 2"));
-    // fprintf(stderr, "TU FIEJAAA should be 1:%d\n", is_retr_command("RETR 232"));
-    // fprintf(stderr, "TU FIEJAAA should be 0:%d\n", is_retr_command("RETR 2d"));
-    // fprintf(stderr, "TU FIEJAAA should be 0:%d\n", is_retr_command(" RETR 2"));
-    // fprintf(stderr, "TU FIEJAAA should be 0:%d\n", is_retr_command("RET 2"));
-    // fprintf(stderr, "TU FIEJAAA should be 0:%d\n", is_retr_command("RETR2"));
 
     ptr = buffer_write_ptr(b, &count);
     n = recv(key->fd, ptr, count, 0);
@@ -886,7 +995,7 @@ void error_print(){
     printf("THERE HAS BEEN AN ERROR");
 }
 
-///////      RESPONSE      ///////
+///////      FILTER      ///////
 
 static void
 start_external_filter_process(struct selector_key *key){
